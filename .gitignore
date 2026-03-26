@@ -1,5 +1,7 @@
 
 .idea/
+sidecar/.env
+sidecar/tidal_session.json
 
 ###> symfony/framework-bundle ###
 /.env.local

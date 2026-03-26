@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from sources.tidal import TidalSource
@@ -6,6 +6,7 @@ from sources.youtube import YouTubeSource
 
 app = FastAPI()
 
+# Instantiated once at startup — Tidal login happens in the constructor.
 tidal = TidalSource()
 youtube = YouTubeSource()
 
@@ -16,15 +17,27 @@ def health():
 
 
 @app.get("/search")
-def search(q: str, source: str = "auto"):
+def search(q: str = "", source: str = "auto"):
     """
-    Resolve a search query against the requested source.
+    Search for tracks via the requested source.
 
     source: "tidal" | "youtube" | "auto"
-    "auto" tries Tidal first and falls back to YouTube if no results.
+
+    "auto" will eventually try Tidal first and fall back to YouTube Music
+    if no results are found. For now it delegates to Tidal only, as YouTube
+    support is not yet implemented.
     """
-    # TODO: implement source routing and delegate to TidalSource / YouTubeSource
-    return {"results": []}
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="Query parameter 'q' must not be empty.")
+
+    if source == "tidal":
+        return tidal.search(q)
+
+    if source == "youtube":
+        return youtube.search(q)
+
+    # auto — Tidal first, YouTube fallback not yet implemented
+    return tidal.search(q)
 
 
 class PlayRequest(BaseModel):

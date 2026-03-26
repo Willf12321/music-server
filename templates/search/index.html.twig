@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Server</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #111;
+            color: #eee;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            min-height: 100vh;
+            padding: 3rem 1rem;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 0.5rem;
+            max-width: 640px;
+            margin: 0 auto 2.5rem;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 0.65rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #1e1e1e;
+            color: #eee;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .search-bar input:focus { border-color: #555; }
+
+        .search-bar button {
+            padding: 0.65rem 1.25rem;
+            border-radius: 6px;
+            border: none;
+            background: #2a2a2a;
+            color: #eee;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .search-bar button:hover { background: #333; }
+
+        .results {
+            max-width: 640px;
+            margin: 0 auto;
+            list-style: none;
+        }
+
+        .track {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid #1e1e1e;
+            gap: 1rem;
+        }
+
+        .track-info { flex: 1; min-width: 0; }
+
+        .track-title {
+            font-size: 1rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .track-meta {
+            font-size: 0.8rem;
+            color: #777;
+            margin-top: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .track-duration {
+            font-size: 0.85rem;
+            color: #555;
+            flex-shrink: 0;
+        }
+
+        .no-results {
+            max-width: 640px;
+            margin: 0 auto;
+            color: #555;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+
+<form class="search-bar" action="/search" method="get">
+    <input
+        type="text"
+        name="q"
+        value="{{ query|e }}"
+        placeholder="Search for a track…"
+        autofocus
+    >
+    <button type="submit">Search</button>
+</form>
+
+{% if searched %}
+    {% if results is empty %}
+        <p class="no-results">No results found for "{{ query|e }}".</p>
+    {% else %}
+        <ul class="results">
+            {% for track in results %}
+                <li class="track">
+                    <div class="track-info">
+                        <div class="track-title">{{ track.title }}</div>
+                        <div class="track-meta">{{ track.artist }} &mdash; {{ track.album }}</div>
+                    </div>
+                    <span class="track-duration">{{ track.formattedDuration() }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endif %}
+
+</body>
+</html>

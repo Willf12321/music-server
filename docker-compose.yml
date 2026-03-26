@@ -20,6 +20,12 @@ services:
       dockerfile: ../docker/python-sidecar/Dockerfile
     ports:
       - "8001:8001"
+    # sidecar/.env should be created from sidecar/.env.example and is gitignored.
+    env_file:
+      - ./sidecar/.env
+    volumes:
+      # Persists the Tidal OAuth session so login only needs to happen once.
+      - ./sidecar/tidal_session.json:/app/tidal_session.json
 
   mpd:
     build: ./docker/mpd

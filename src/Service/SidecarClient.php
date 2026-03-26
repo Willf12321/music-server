@@ -1,0 +1,57 @@
+<?php
+
+namespace App\Service;
+
+use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+
+/**
+ * Single point of contact between Symfony and the Python sidecar service.
+ *
+ * All communication with the sidecar goes through here. Nothing else in the
+ * application should make HTTP calls to the sidecar directly.
+ */
+class SidecarClient
+{
+    public function __construct(
+        private readonly HttpClientInterface $httpClient,
+        private readonly LoggerInterface $logger,
+        private readonly string $baseUrl = 'http://python-sidecar:8001',
+    ) {}
+
+    public function search(string $query): array
+    {
+        if ($query === '') {
+            throw new \InvalidArgumentException('Search query must not be empty.');
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $this->baseUrl . '/search', [
+                'query' => ['q' => $query, 'source' => 'auto'],
+            ]);
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Sidecar search request failed.', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function health(): bool
+    {
+        try {
+            $response = $this->httpClient->request('GET', $this->baseUrl . '/health');
+            $data = $response->toArray();
+
+            return ($data['status'] ?? '') === 'ok';
+        } catch (\Throwable $e) {
+            $this->logger->error('Sidecar health check failed.', ['error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+}
