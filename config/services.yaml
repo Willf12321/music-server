@@ -22,3 +22,8 @@ services:
     App\Service\SidecarClient:
         arguments:
             $baseUrl: '%env(SIDECAR_URL)%'
+
+    App\Service\MpdService:
+        arguments:
+            $host: '%env(MPD_HOST)%'
+            $port: '%env(int:MPD_PORT)%'

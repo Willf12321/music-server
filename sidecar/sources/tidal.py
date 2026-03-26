@@ -85,9 +85,12 @@ class TidalSource:
         """
         Return the best available stream URL for a track.
 
-        Quality is set to high_lossless at the session level (Config).
+        Quality fallback chain: high_lossless → high_lossless (HIGH) → low_320k
+        We always want the best available rather than failing hard — a lower
+        quality stream is better than no stream. high_lossless is tried first
+        because lossless FLAC is the primary reason to use Tidal over YouTube.
         get_url() is used rather than get_stream() because MPD needs a direct
-        URL, not a stream manifest.
+        URL, not a manifest.
         """
         if self._session is None:
             logger.error("Tidal session not ready — cannot resolve track.")
@@ -95,10 +98,23 @@ class TidalSource:
 
         try:
             track = self._session.track(int(track_id))
-            return track.get_url()
+
+            for quality in [
+                tidalapi.Quality.high_lossless,
+                tidalapi.Quality.low_320k,
+                tidalapi.Quality.low_96k,
+            ]:
+                try:
+                    self._session.audio_quality = quality
+                    url = track.get_url()
+                    if url:
+                        return url
+                except Exception:
+                    continue
         except Exception as e:
             logger.error("Failed to resolve Tidal track %s: %s", track_id, e)
-            return None
+
+        return None
 
     def _format_track(self, track: tidalapi.Track) -> dict:
         return {

@@ -37,6 +37,10 @@ services:
       # Passes the ALSA sound device directly into the container,
       # giving MPD raw hardware access without PulseAudio in the path.
       - /dev/snd:/dev/snd
+    group_add:
+      # The audio group (GID 29 on most Linux hosts) owns /dev/snd.
+      # Without this the container user cannot open the ALSA device.
+      - "29"
 
   redis:
     image: redis:alpine

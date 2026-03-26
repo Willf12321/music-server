@@ -12,8 +12,10 @@
             color: #eee;
             font-family: ui-sans-serif, system-ui, sans-serif;
             min-height: 100vh;
-            padding: 3rem 1rem;
+            padding: 3rem 1rem 10rem;
         }
+
+        /* ── Search ── */
 
         .search-bar {
             display: flex;
@@ -47,6 +49,8 @@
 
         .search-bar button:hover { background: #333; }
 
+        /* ── Results ── */
+
         .results {
             max-width: 640px;
             margin: 0 auto;
@@ -55,8 +59,7 @@
 
         .track {
             display: flex;
-            align-items: baseline;
-            justify-content: space-between;
+            align-items: center;
             padding: 0.85rem 0;
             border-bottom: 1px solid #1e1e1e;
             gap: 1rem;
@@ -87,11 +90,144 @@
             flex-shrink: 0;
         }
 
+        .track-actions {
+            display: flex;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+
         .no-results {
             max-width: 640px;
             margin: 0 auto;
             color: #555;
             font-size: 0.95rem;
+        }
+
+        /* ── Shared button style ── */
+
+        .btn {
+            padding: 0.3rem 0.65rem;
+            border-radius: 5px;
+            border: none;
+            background: #2a2a2a;
+            color: #eee;
+            font-size: 0.8rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .btn:hover { background: #383838; }
+        .btn:disabled { opacity: 0.5; cursor: default; }
+        .btn.confirm { color: #7dba84; }
+
+        /* ── Queue panel ── */
+
+        .queue-panel {
+            position: fixed;
+            bottom: 72px; /* sits above the now-playing bar */
+            left: 0;
+            right: 0;
+            max-height: 40vh;
+            overflow-y: auto;
+            background: #1a1a1a;
+            border-top: 1px solid #2a2a2a;
+            display: none;
+            padding: 0.75rem 1rem;
+        }
+
+        .queue-panel.open { display: block; }
+
+        .queue-panel ol {
+            max-width: 640px;
+            margin: 0 auto;
+            padding-left: 1.5rem;
+        }
+
+        .queue-panel li {
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #222;
+            font-size: 0.875rem;
+        }
+
+        .queue-panel li span { color: #777; margin-left: 0.5rem; font-size: 0.8rem; }
+
+        /* ── Now playing bar ── */
+
+        .now-playing {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 72px;
+            background: #1a1a1a;
+            border-top: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0 1.25rem;
+        }
+
+        .now-playing-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .now-playing-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .now-playing-artist {
+            font-size: 0.75rem;
+            color: #777;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .playback-controls .btn {
+            font-size: 1rem;
+            padding: 0.35rem 0.7rem;
+        }
+
+        .volume-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .volume-wrap label { font-size: 0.75rem; color: #555; }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 80px;
+            height: 4px;
+            border-radius: 2px;
+            background: #333;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #aaa;
+        }
+
+        .queue-toggle {
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -114,17 +250,202 @@
     {% else %}
         <ul class="results">
             {% for track in results %}
-                <li class="track">
+                <li class="track"
+                    data-track-id="{{ track.id|e }}"
+                    data-source="{{ track.source|e }}">
                     <div class="track-info">
                         <div class="track-title">{{ track.title }}</div>
                         <div class="track-meta">{{ track.artist }} &mdash; {{ track.album }}</div>
                     </div>
                     <span class="track-duration">{{ track.formattedDuration() }}</span>
+                    <div class="track-actions">
+                        <button class="btn play-btn" onclick="playTrack(this)">▶</button>
+                        <button class="btn queue-btn" onclick="queueTrack(this)">+ Queue</button>
+                    </div>
                 </li>
             {% endfor %}
         </ul>
     {% endif %}
 {% endif %}
+
+<!-- Queue panel — slides up above the now-playing bar -->
+<div class="queue-panel" id="queuePanel">
+    <ol id="queueList"></ol>
+</div>
+
+<!-- Now playing bar — fixed to the bottom of the viewport -->
+<div class="now-playing">
+    <div class="now-playing-info">
+        <div class="now-playing-title" id="npTitle">—</div>
+        <div class="now-playing-artist" id="npArtist"></div>
+    </div>
+
+    <div class="playback-controls">
+        <button class="btn" onclick="sendCommand('/playback/previous')">⏮</button>
+        <button class="btn" id="playPauseBtn" onclick="sendCommand('/playback/pause')">⏸</button>
+        <button class="btn" onclick="sendCommand('/playback/stop')">⏹</button>
+        <button class="btn" onclick="sendCommand('/playback/next')">⏭</button>
+    </div>
+
+    <div class="volume-wrap">
+        <label for="volumeSlider">vol</label>
+        <input type="range" id="volumeSlider" min="0" max="100" value="80">
+    </div>
+
+    <button class="btn queue-toggle" id="queueToggle" onclick="toggleQueue()">Queue (0)</button>
+</div>
+
+<script>
+    // ── State ──────────────────────────────────────────────────────────────
+
+    let queueOpen = false;
+
+    // ── Playback commands ──────────────────────────────────────────────────
+
+    async function sendCommand(path) {
+        await fetch(path, { method: 'POST' });
+    }
+
+    async function playTrack(btn) {
+        const li = btn.closest('li');
+        const payload = { track_id: li.dataset.trackId, source: li.dataset.source };
+
+        btn.disabled = true;
+
+        const res = await fetch('/playback/play', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+            btn.textContent = 'Playing…';
+            btn.classList.add('confirm');
+            setTimeout(() => {
+                btn.textContent = '▶';
+                btn.classList.remove('confirm');
+                btn.disabled = false;
+            }, 1500);
+        } else {
+            btn.textContent = 'Error';
+            setTimeout(() => { btn.textContent = '▶'; btn.disabled = false; }, 1500);
+        }
+    }
+
+    async function queueTrack(btn) {
+        const li = btn.closest('li');
+        const payload = { track_id: li.dataset.trackId, source: li.dataset.source };
+
+        btn.disabled = true;
+
+        const res = await fetch('/playback/queue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+            btn.textContent = 'Queued';
+            btn.classList.add('confirm');
+            setTimeout(() => {
+                btn.textContent = '+ Queue';
+                btn.classList.remove('confirm');
+                btn.disabled = false;
+            }, 1500);
+
+            // Refresh the queue panel if it's open so the new track appears.
+            if (queueOpen) loadQueue();
+        } else {
+            btn.textContent = 'Error';
+            setTimeout(() => { btn.textContent = '+ Queue'; btn.disabled = false; }, 1500);
+        }
+    }
+
+    // ── Status polling ─────────────────────────────────────────────────────
+
+    async function pollStatus() {
+        try {
+            const res = await fetch('/playback/status');
+            if (!res.ok) return;
+
+            const status = await res.json();
+
+            updateNowPlaying(status);
+            updateQueueToggle(status.playlistlength ?? 0);
+        } catch (_) {
+            // Network error — silently skip this tick.
+        }
+    }
+
+    function updateNowPlaying(status) {
+        const state = status.state ?? 'stop';
+        const playPauseBtn = document.getElementById('playPauseBtn');
+
+        // Toggle button label based on MPD state.
+        playPauseBtn.textContent = state === 'play' ? '⏸' : '▶';
+
+        if (status.title) {
+            document.getElementById('npTitle').textContent = status.title;
+            document.getElementById('npArtist').textContent = status.artist ?? '';
+        } else if (state === 'stop') {
+            document.getElementById('npTitle').textContent = '—';
+            document.getElementById('npArtist').textContent = '';
+        }
+    }
+
+    function updateQueueToggle(length) {
+        document.getElementById('queueToggle').textContent = `Queue (${length})`;
+    }
+
+    // Poll every 2 seconds so the now-playing bar stays current.
+    setInterval(pollStatus, 2000);
+    pollStatus(); // run immediately on page load
+
+    // ── Queue panel ────────────────────────────────────────────────────────
+
+    async function loadQueue() {
+        const res = await fetch('/playback/queue');
+        if (!res.ok) return;
+
+        const tracks = await res.json();
+        const list = document.getElementById('queueList');
+
+        if (tracks.length === 0) {
+            list.innerHTML = '<li style="color:#555">Queue is empty.</li>';
+            return;
+        }
+
+        list.innerHTML = tracks.map(t =>
+            `<li>${t.title}<span>${t.artist}</span></li>`
+        ).join('');
+    }
+
+    function toggleQueue() {
+        const panel = document.getElementById('queuePanel');
+        queueOpen = !queueOpen;
+        panel.classList.toggle('open', queueOpen);
+
+        // Load queue contents each time the panel is opened.
+        if (queueOpen) loadQueue();
+    }
+
+    // ── Volume slider ──────────────────────────────────────────────────────
+
+    // Debounced so we don't flood MPD with setvol commands while the user
+    // is dragging — the slider fires 'input' continuously during drag.
+    let volumeTimer = null;
+
+    document.getElementById('volumeSlider').addEventListener('input', function () {
+        clearTimeout(volumeTimer);
+        volumeTimer = setTimeout(() => {
+            fetch('/playback/volume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ volume: parseInt(this.value) }),
+            });
+        }, 500);
+    });
+</script>
 
 </body>
 </html>

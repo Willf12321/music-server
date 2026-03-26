@@ -41,6 +41,29 @@ class SidecarClient
         }
     }
 
+    public function resolve(string $trackId, string $source): ?string
+    {
+        try {
+            $response = $this->httpClient->request('POST', $this->baseUrl . '/resolve', [
+                'json' => ['track_id' => $trackId, 'source' => $source],
+            ]);
+
+            if ($response->getStatusCode() === 404) {
+                return null;
+            }
+
+            return $response->toArray()['url'] ?? null;
+        } catch (\Throwable $e) {
+            $this->logger->error('Sidecar resolve request failed.', [
+                'track_id' => $trackId,
+                'source'   => $source,
+                'error'    => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
     public function health(): bool
     {
         try {
