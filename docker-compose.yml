@@ -13,3 +13,26 @@ services:
     build: ./docker/php
     volumes:
       - .:/var/www/html
+
+  python-sidecar:
+    build:
+      context: ./sidecar
+      dockerfile: ../docker/python-sidecar/Dockerfile
+    ports:
+      - "8001:8001"
+
+  mpd:
+    build: ./docker/mpd
+    ports:
+      - "6600:6600"
+    volumes:
+      - ./music:/music
+    devices:
+      # Passes the ALSA sound device directly into the container,
+      # giving MPD raw hardware access without PulseAudio in the path.
+      - /dev/snd:/dev/snd
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
