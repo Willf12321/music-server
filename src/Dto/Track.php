@@ -9,7 +9,7 @@ namespace App\Dto;
  * adding a track to its queue. Display formatting to mm:ss happens here
  * rather than at call sites so the conversion logic lives in one place.
  */
-readonly class TrackDto
+readonly class Track
 {
     public function __construct(
         public string $id,

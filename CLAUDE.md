@@ -111,3 +111,6 @@ Maximum **120 characters** per line.
 ### Human Readability
 Write code for the next person reading it. Prefer clarity over brevity.
 Name things after what they mean in the domain, not what they do technically.
+
+### Naming Conventions
+All services should end in 'er' and not include 'Service'.
