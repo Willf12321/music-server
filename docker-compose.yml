@@ -34,6 +34,7 @@ services:
     environment:
       MPD_AUDIO_DEVICE: '${MPD_AUDIO_DEVICE}'
       MPD_MIXER_TYPE: '${MPD_MIXER_TYPE}'
+      MPD_MIXER_CONTROL: '${MPD_MIXER_CONTROL}'
     volumes:
       - ./music:/music
       - mpd_data:/var/lib/mpd

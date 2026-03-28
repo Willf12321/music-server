@@ -7,5 +7,6 @@ touch /var/lib/mpd/database
 # This allows MPD_AUDIO_DEVICE to differ between dev and production.
 sed -i "s|\$MPD_AUDIO_DEVICE|${MPD_AUDIO_DEVICE}|g" /etc/mpd.conf
 sed -i "s|\$MPD_MIXER_TYPE|${MPD_MIXER_TYPE}|g" /etc/mpd.conf
+sed -i "s|\$MPD_MIXER_CONTROL|${MPD_MIXER_CONTROL}|g" /etc/mpd.conf
 
 exec "$@"
