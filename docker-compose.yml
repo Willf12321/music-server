@@ -33,6 +33,7 @@ services:
       - "6600:6600"
     volumes:
       - ./music:/music
+      - mpd_data:/var/lib/mpd
     devices:
       # Passes the ALSA sound device directly into the container,
       # giving MPD raw hardware access without PulseAudio in the path.
@@ -46,3 +47,6 @@ services:
     image: redis:alpine
     ports:
       - "6379:6379"
+
+volumes:
+  mpd_data:
