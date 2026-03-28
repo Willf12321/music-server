@@ -33,6 +33,7 @@ services:
       - "6600:6600"
     environment:
       MPD_AUDIO_DEVICE: '${MPD_AUDIO_DEVICE}'
+      MPD_MIXER_TYPE: '${MPD_MIXER_TYPE}'
     volumes:
       - ./music:/music
       - mpd_data:/var/lib/mpd
