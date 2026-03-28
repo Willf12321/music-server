@@ -31,6 +31,8 @@ services:
     build: ./docker/mpd
     ports:
       - "6600:6600"
+    environment:
+      MPD_AUDIO_DEVICE: '${MPD_AUDIO_DEVICE}'
     volumes:
       - ./music:/music
       - mpd_data:/var/lib/mpd
