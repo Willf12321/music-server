@@ -23,7 +23,11 @@ services:
         arguments:
             $baseUrl: '%env(SIDECAR_URL)%'
 
-    App\Service\MpdPlayer:
+    App\Service\MpdPlayer\MpdConnector:
         arguments:
             $host: '%env(MPD_HOST)%'
             $port: '%env(int:MPD_PORT)%'
+
+    App\Controller\PlaybackController:
+        arguments:
+            $streamBaseUrl: '%env(STREAM_BASE_URL)%'

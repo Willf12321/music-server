@@ -2,11 +2,12 @@
 
 namespace App\Controller;
 
-use App\Enum\MpdCommand;
 use App\Exception\InvalidRequestBodyException;
 use App\Exception\MpdException;
 use App\Exception\UnresolvableTrackException;
-use App\Service\MpdPlayer;
+use App\Service\MpdPlayer\MpdDriver;
+use App\Service\MpdPlayer\MpdInspector;
+use App\Service\MpdPlayer\MpdQueuer;
 use App\Service\TrackResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,9 +25,12 @@ use Symfony\Component\Routing\Attribute\Route;
 class PlaybackController extends AbstractController
 {
     public function __construct(
-        private readonly MpdPlayer $mpd,
+        private readonly MpdQueuer $queuer,
+        private readonly MpdDriver $driver,
+        private readonly MpdInspector $inspector,
         private readonly TrackResolver $trackResolver,
         private readonly LoggerInterface $logger,
+        private readonly string $streamBaseUrl = 'http://nginx',
     ) {}
 
     #[Route('/play', methods: ['POST'])]
@@ -34,7 +38,7 @@ class PlaybackController extends AbstractController
     {
         try {
             $url = $this->trackResolver->resolveFromRequest($request);
-            $this->mpd->play($url);
+            $this->queuer->play($url);
         } catch (InvalidRequestBodyException $e) {
             return $this->json(['error' => $e->getMessage()], 422);
         } catch (UnresolvableTrackException $e) {
@@ -52,12 +56,16 @@ class PlaybackController extends AbstractController
     public function queue(Request $request): JsonResponse
     {
         try {
-            $url = $this->trackResolver->resolveFromRequest($request);
-            $this->mpd->addToQueue($url);
+            ['track_id' => $trackId, 'source' => $source] = $this->trackResolver->extractFromRequest($request);
+
+            // Use a proxy URL rather than resolving the stream URL immediately.
+            // Tidal URLs are signed and expire within minutes — by the time MPD
+            // auto-advances or the user presses next, a pre-resolved URL is stale.
+            // The /stream endpoint resolves a fresh URL on demand when MPD fetches it.
+            $proxyUrl = "{$this->streamBaseUrl}/stream/{$source}/{$trackId}";
+            $this->queuer->addToQueue($proxyUrl);
         } catch (InvalidRequestBodyException $e) {
             return $this->json(['error' => $e->getMessage()], 422);
-        } catch (UnresolvableTrackException $e) {
-            return $this->json(['error' => $e->getMessage()], 502);
         } catch (MpdException $e) {
             $this->logger->error('MPD queue failed.', ['error' => $e->getMessage()]);
 
@@ -71,7 +79,7 @@ class PlaybackController extends AbstractController
     public function pause(): JsonResponse
     {
         try {
-            $this->mpd->sendCommand(MpdCommand::Pause);
+            $this->driver->pause();
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
@@ -83,7 +91,7 @@ class PlaybackController extends AbstractController
     public function stop(): JsonResponse
     {
         try {
-            $this->mpd->sendCommand(MpdCommand::Stop);
+            $this->driver->stop();
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
@@ -95,7 +103,7 @@ class PlaybackController extends AbstractController
     public function next(): JsonResponse
     {
         try {
-            $this->mpd->sendCommand(MpdCommand::Next);
+            $this->driver->next();
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
@@ -107,7 +115,7 @@ class PlaybackController extends AbstractController
     public function previous(): JsonResponse
     {
         try {
-            $this->mpd->sendCommand(MpdCommand::Previous);
+            $this->driver->previous();
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
@@ -119,7 +127,7 @@ class PlaybackController extends AbstractController
     public function status(): JsonResponse
     {
         try {
-            return $this->json($this->mpd->getStatus());
+            return $this->json($this->inspector->getStatus());
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
@@ -129,10 +137,32 @@ class PlaybackController extends AbstractController
     public function getQueue(): JsonResponse
     {
         try {
-            return $this->json($this->mpd->getQueue());
+            return $this->json($this->inspector->getQueue());
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
+    }
+
+    #[Route('/seek', methods: ['POST'])]
+    public function seek(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return $this->json(['error' => 'Invalid JSON body.'], 400);
+        }
+
+        if (!isset($data['position'])) {
+            return $this->json(['error' => 'position is required.'], 422);
+        }
+
+        try {
+            $this->driver->seek((int) $data['position']);
+        } catch (MpdException $e) {
+            return $this->json(['error' => $e->getMessage()], 502);
+        }
+
+        return $this->json(['status' => 'ok']);
     }
 
     #[Route('/volume', methods: ['POST'])]
@@ -149,7 +179,7 @@ class PlaybackController extends AbstractController
         }
 
         try {
-            $this->mpd->setVolume((int) $data['volume']);
+            $this->driver->setVolume((int) $data['volume']);
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }

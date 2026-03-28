@@ -124,7 +124,7 @@
 
         .queue-panel {
             position: fixed;
-            bottom: 72px; /* sits above the now-playing bar */
+            bottom: 90px; /* sits above the now-playing bar */
             left: 0;
             right: 0;
             max-height: 40vh;
@@ -158,13 +158,37 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 72px;
             background: #1a1a1a;
             border-top: 1px solid #2a2a2a;
             display: flex;
+            flex-direction: column;
+            padding: 0.5rem 1.25rem 0.4rem;
+            gap: 0.35rem;
+        }
+
+        /* Seek row */
+
+        .seek-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .seek-time {
+            font-size: 0.7rem;
+            color: #555;
+            flex-shrink: 0;
+            width: 2.8rem;
+        }
+
+        .seek-time.right { text-align: right; }
+
+        /* Controls row */
+
+        .controls-row {
+            display: flex;
             align-items: center;
             gap: 1rem;
-            padding: 0 1.25rem;
         }
 
         .now-playing-info {
@@ -210,7 +234,6 @@
 
         input[type=range] {
             -webkit-appearance: none;
-            width: 80px;
             height: 4px;
             border-radius: 2px;
             background: #333;
@@ -225,6 +248,9 @@
             border-radius: 50%;
             background: #aaa;
         }
+
+        #seekBar { flex: 1; width: 100%; }
+        #volumeSlider { width: 80px; }
 
         .queue-toggle {
             flex-shrink: 0;
@@ -275,30 +301,39 @@
 
 <!-- Now playing bar — fixed to the bottom of the viewport -->
 <div class="now-playing">
-    <div class="now-playing-info">
-        <div class="now-playing-title" id="npTitle">—</div>
-        <div class="now-playing-artist" id="npArtist"></div>
+    <div class="seek-row">
+        <span class="seek-time" id="seekElapsed">0:00</span>
+        <input type="range" id="seekBar" min="0" max="0" value="0">
+        <span class="seek-time right" id="seekDuration">0:00</span>
     </div>
 
-    <div class="playback-controls">
-        <button class="btn" onclick="sendCommand('/playback/previous')">⏮</button>
-        <button class="btn" id="playPauseBtn" onclick="sendCommand('/playback/pause')">⏸</button>
-        <button class="btn" onclick="sendCommand('/playback/stop')">⏹</button>
-        <button class="btn" onclick="sendCommand('/playback/next')">⏭</button>
-    </div>
+    <div class="controls-row">
+        <div class="now-playing-info">
+            <div class="now-playing-title" id="npTitle">—</div>
+            <div class="now-playing-artist" id="npArtist"></div>
+        </div>
 
-    <div class="volume-wrap">
-        <label for="volumeSlider">vol</label>
-        <input type="range" id="volumeSlider" min="0" max="100" value="80">
-    </div>
+        <div class="playback-controls">
+            <button class="btn" onclick="sendCommand('/playback/previous')">⏮</button>
+            <button class="btn" id="playPauseBtn" onclick="sendCommand('/playback/pause')">⏸</button>
+            <button class="btn" onclick="sendCommand('/playback/stop')">⏹</button>
+            <button class="btn" onclick="sendCommand('/playback/next')">⏭</button>
+        </div>
 
-    <button class="btn queue-toggle" id="queueToggle" onclick="toggleQueue()">Queue (0)</button>
+        <div class="volume-wrap">
+            <label for="volumeSlider">vol</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="80">
+        </div>
+
+        <button class="btn queue-toggle" id="queueToggle" onclick="toggleQueue()">Queue (0)</button>
+    </div>
 </div>
 
 <script>
     // ── State ──────────────────────────────────────────────────────────────
 
-    let queueOpen = false;
+    let queueOpen  = false;
+    let isSeeking  = false;  // true while the user is dragging the seek bar
 
     // ── Playback commands ──────────────────────────────────────────────────
 
@@ -378,19 +413,42 @@
     }
 
     function updateNowPlaying(status) {
-        const state = status.state ?? 'stop';
-        const playPauseBtn = document.getElementById('playPauseBtn');
+        const state    = status.state ?? 'stop';
+        const elapsed  = parseFloat(status.elapsed ?? 0);
+        const duration = parseFloat(status.duration ?? 0);
 
-        // Toggle button label based on MPD state.
-        playPauseBtn.textContent = state === 'play' ? '⏸' : '▶';
+        document.getElementById('playPauseBtn').textContent = state === 'play' ? '⏸' : '▶';
 
         if (status.title) {
-            document.getElementById('npTitle').textContent = status.title;
+            document.getElementById('npTitle').textContent  = status.title;
             document.getElementById('npArtist').textContent = status.artist ?? '';
         } else if (state === 'stop') {
-            document.getElementById('npTitle').textContent = '—';
+            document.getElementById('npTitle').textContent  = '—';
             document.getElementById('npArtist').textContent = '';
         }
+
+        updateSeekBar(elapsed, duration);
+    }
+
+    function updateSeekBar(elapsed, duration) {
+        const bar = document.getElementById('seekBar');
+
+        bar.max = duration || 0;
+
+        // Don't move the thumb while the user is dragging — it would fight them.
+        if (!isSeeking) {
+            bar.value = elapsed;
+        }
+
+        document.getElementById('seekElapsed').textContent  = formatTime(elapsed);
+        document.getElementById('seekDuration').textContent = formatTime(duration);
+    }
+
+    function formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
     function updateQueueToggle(length) {
@@ -429,6 +487,26 @@
         if (queueOpen) loadQueue();
     }
 
+    // ── Seek bar ───────────────────────────────────────────────────────────
+
+    const seekBar = document.getElementById('seekBar');
+
+    // While dragging, update the elapsed display so the user sees where they're
+    // heading, but don't send a command yet.
+    seekBar.addEventListener('input', function () {
+        isSeeking = true;
+        document.getElementById('seekElapsed').textContent = formatTime(parseInt(this.value));
+    });
+
+    // Send the seek command when the user releases the thumb.
+    seekBar.addEventListener('change', function () {
+        fetch('/playback/seek', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ position: parseInt(this.value) }),
+        }).finally(() => { isSeeking = false; });
+    });
+
     // ── Volume slider ──────────────────────────────────────────────────────
 
     // Debounced so we don't flood MPD with setvol commands while the user
@@ -443,7 +521,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ volume: parseInt(this.value) }),
             });
-        }, 500);
+        }, 140);
     });
 </script>
 
