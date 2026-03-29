@@ -7,7 +7,7 @@ use App\Exception\MpdException;
 use App\Service\MpdPlayer\MpdDriver;
 use App\Service\MpdPlayer\MpdInspector;
 use App\Service\MpdPlayer\MpdQueuer;
-use App\Service\RadioSearcher;
+use App\Repository\RadioStationRepository;
 use App\Service\TrackMetadataStorer;
 use App\Service\TrackResolver;
 use Psr\Log\LoggerInterface;
@@ -31,7 +31,7 @@ class PlaybackController extends AbstractController
         private readonly MpdInspector $inspector,
         private readonly TrackResolver $trackResolver,
         private readonly TrackMetadataStorer $metadataStorer,
-        private readonly RadioSearcher $radioSearcher,
+        private readonly RadioStationRepository $radioStations,
         private readonly LoggerInterface $logger,
         private readonly string $streamBaseUrl = 'http://nginx',
     ) {}
@@ -58,21 +58,24 @@ class PlaybackController extends AbstractController
     #[Route('/radio', methods: ['POST'])]
     public function playRadio(Request $request): JsonResponse
     {
-        $data      = json_decode($request->getContent(), true) ?? [];
-        $stationId = $data['station_id'] ?? null;
+        $data = json_decode($request->getContent(), true) ?? [];
 
-        if (!$stationId) {
-            return $this->json(['error' => 'station_id is required.'], 422);
-        }
-
-        $station = $this->radioSearcher->findById($stationId);
-
-        if ($station === null) {
-            return $this->json(['error' => 'Station not found.'], 404);
+        // Resolve the stream URL from either a saved station ID or a direct URL
+        // (used when playing from the discovery catalogue before saving).
+        if (!empty($data['station_id'])) {
+            $station = $this->radioStations->find((int) $data['station_id']);
+            if ($station === null) {
+                return $this->json(['error' => 'Station not found.'], 404);
+            }
+            $streamUrl = $station->getStreamUrl();
+        } elseif (!empty($data['stream_url'])) {
+            $streamUrl = $data['stream_url'];
+        } else {
+            return $this->json(['error' => 'station_id or stream_url is required.'], 422);
         }
 
         try {
-            $this->queuer->play($station->streamUrl);
+            $this->queuer->play($streamUrl);
         } catch (MpdException $e) {
             $this->logger->error('MPD radio play failed.', ['error' => $e->getMessage()]);
 
@@ -172,10 +175,10 @@ class PlaybackController extends AbstractController
                 }
 
                 // Radio streams have no tags either — identify by stream URL and use station name.
-                $station = $this->radioSearcher->findByStreamUrl($file);
+                $station = $this->radioStations->findByStreamUrl($file);
                 if ($station !== null) {
-                    $status['title']  = $station->name;
-                    $status['artist'] = $station->genre;
+                    $status['title']  = $station->getName();
+                    $status['artist'] = $station->getGenre();
                 }
             }
 

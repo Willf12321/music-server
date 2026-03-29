@@ -1,7 +1,7 @@
 FROM php:8.3-fpm-alpine
 
 RUN apk add --no-cache git curl unzip icu-dev libxml2-dev \
-    && docker-php-ext-install intl xml
+    && docker-php-ext-install intl xml pdo_mysql
 
 RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
     && pecl install redis \

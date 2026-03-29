@@ -52,5 +52,18 @@ services:
     ports:
       - "6379:6379"
 
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: '${MYSQL_ROOT_PASSWORD}'
+      MYSQL_DATABASE: music_server
+      MYSQL_USER: music
+      MYSQL_PASSWORD: '${MYSQL_PASSWORD}'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
 volumes:
   mpd_data:
+  mysql_data:

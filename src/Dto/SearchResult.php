@@ -5,9 +5,9 @@ namespace App\Dto;
 readonly class SearchResult
 {
     /**
-     * @param Track[]        $tracks
-     * @param Album[]        $albums
-     * @param RadioStation[] $stations
+     * @param Track[]             $tracks
+     * @param Album[]             $albums
+     * @param DiscoveredStation[] $stations
      */
     public function __construct(
         public array $tracks,

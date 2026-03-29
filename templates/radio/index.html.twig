@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Stations — Music Server</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #111;
+            color: #eee;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            min-height: 100vh;
+            padding: 3rem 1rem;
+        }
+
+        .header {
+            max-width: 640px;
+            margin: 0 auto 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 { font-size: 1.4rem; font-weight: 600; }
+
+        .nav-link {
+            color: #888;
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+
+        .nav-link:hover { color: #eee; }
+
+        .btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 5px;
+            border: none;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary { background: #2a2a2a; color: #eee; }
+        .btn-primary:hover { background: #333; }
+        .btn-danger  { background: #3a1a1a; color: #e88; }
+        .btn-danger:hover { background: #4a2020; }
+        .btn-edit    { background: #1a2a3a; color: #8ae; }
+        .btn-edit:hover { background: #203040; }
+
+        .station-list {
+            max-width: 640px;
+            margin: 0 auto;
+            list-style: none;
+        }
+
+        .station {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.85rem 1rem;
+            border-radius: 6px;
+            background: #1a1a1a;
+            margin-bottom: 0.5rem;
+        }
+
+        .station-info { flex: 1; min-width: 0; }
+
+        .station-name {
+            font-size: 0.95rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .station-meta {
+            font-size: 0.78rem;
+            color: #666;
+            margin-top: 0.15rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .station-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+
+        .empty {
+            max-width: 640px;
+            margin: 0 auto;
+            text-align: center;
+            color: #555;
+            padding: 3rem 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <a class="nav-link" href="/">← Search</a>
+        <h1 style="display:inline; margin-left: 1rem;">Radio Stations</h1>
+    </div>
+    <a href="/radio/new" class="btn btn-primary">+ Add Station</a>
+</div>
+
+{% if stations is empty %}
+    <p class="empty">No stations yet. Add one to get started.</p>
+{% else %}
+    <ul class="station-list">
+        {% for station in stations %}
+            <li class="station">
+                <div class="station-info">
+                    <div class="station-name">{{ station.name }}</div>
+                    <div class="station-meta">{{ station.genre ?? 'No genre' }} &mdash; {{ station.streamUrl }}</div>
+                </div>
+                <div class="station-actions">
+                    <a href="/radio/{{ station.id }}/edit" class="btn btn-edit">Edit</a>
+                    <form method="POST" action="/radio/{{ station.id }}/delete" style="display:inline"
+                          onsubmit="return confirm('Delete {{ station.name|e('js') }}?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+</body>
+</html>

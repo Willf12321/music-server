@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ station ? 'Edit' : 'Add' }} Station — Music Server</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #111;
+            color: #eee;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            min-height: 100vh;
+            padding: 3rem 1rem;
+        }
+
+        .header {
+            max-width: 480px;
+            margin: 0 auto 2rem;
+        }
+
+        .nav-link { color: #888; text-decoration: none; font-size: 0.875rem; }
+        .nav-link:hover { color: #eee; }
+
+        h1 { font-size: 1.4rem; font-weight: 600; margin-top: 0.75rem; }
+
+        form {
+            max-width: 480px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.875rem; color: #aaa; }
+
+        input {
+            padding: 0.65rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #1e1e1e;
+            color: #eee;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input:focus { border-color: #555; }
+
+        .error {
+            padding: 0.65rem 1rem;
+            background: #3a1a1a;
+            border-radius: 6px;
+            color: #e88;
+            font-size: 0.875rem;
+        }
+
+        .actions { display: flex; gap: 0.75rem; }
+
+        button[type=submit] {
+            padding: 0.65rem 1.5rem;
+            border-radius: 6px;
+            border: none;
+            background: #2a2a2a;
+            color: #eee;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        button[type=submit]:hover { background: #333; }
+
+        .cancel { color: #666; text-decoration: none; font-size: 0.875rem; align-self: center; }
+        .cancel:hover { color: #aaa; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <a class="nav-link" href="/radio">← Radio Stations</a>
+    <h1>{{ station ? 'Edit Station' : 'Add Station' }}</h1>
+</div>
+
+<form method="POST" action="{{ action }}">
+    {% if error is defined and error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <label>
+        Name
+        <input type="text" name="name" value="{{ station ? station.name : '' }}" placeholder="e.g. NTS Radio 1" required>
+    </label>
+
+    <label>
+        Stream URL
+        <input type="url" name="stream_url" value="{{ station ? station.streamUrl : '' }}" placeholder="https://..." required>
+    </label>
+
+    <label>
+        Genre <span style="color:#555">(optional)</span>
+        <input type="text" name="genre" value="{{ station ? (station.genre ?? '') : '' }}" placeholder="e.g. Various, Jazz, Electronic">
+    </label>
+
+    <div class="actions">
+        <button type="submit">{{ station ? 'Save Changes' : 'Add Station' }}</button>
+        <a href="/radio" class="cancel">Cancel</a>
+    </div>
+</form>
+
+</body>
+</html>
