@@ -25,6 +25,12 @@ class TrackResolver
     {
         ['track_id' => $trackId, 'source' => $source] = $this->extractFromRequest($request);
 
+        return $this->resolve($trackId, $source);
+    }
+
+    /** @throws UnresolvableTrackException if the sidecar cannot produce a stream URL. */
+    public function resolve(string $trackId, string $source): string
+    {
         $url = $this->sidecar->resolve($trackId, $source);
 
         if ($url === null) {
@@ -35,12 +41,12 @@ class TrackResolver
     }
 
     /**
-     * Validates the request body and returns track_id and source without resolving.
+     * Validates the request body and returns track_id, source, and optional metadata fields.
      *
      * Used when the caller wants to build a proxy URL rather than resolve immediately,
      * e.g. when queuing tracks whose stream URLs would expire before playback.
      *
-     * @return array{track_id: string, source: string}
+     * @return array{track_id: string, source: string, title: ?string, artist: ?string, album: ?string, date: ?string}
      * @throws InvalidRequestBodyException if the body is missing, invalid JSON, or missing required fields.
      */
     public function extractFromRequest(Request $request): array
@@ -51,7 +57,14 @@ class TrackResolver
             throw new InvalidRequestBodyException('track_id and source are required.');
         }
 
-        return ['track_id' => $body['track_id'], 'source' => $body['source']];
+        return [
+            'track_id' => $body['track_id'],
+            'source'   => $body['source'],
+            'title'    => $body['title'] ?? null,
+            'artist'   => $body['artist'] ?? null,
+            'album'    => $body['album'] ?? null,
+            'date'     => $body['date'] ?? null,
+        ];
     }
 
     private function decodeBody(Request $request): array

@@ -382,7 +382,10 @@
                 {% for track in result.tracks %}
                     <li class="track"
                         data-track-id="{{ track.id|e }}"
-                        data-source="{{ track.source|e }}">
+                        data-source="{{ track.source|e }}"
+                        data-title="{{ track.title|e }}"
+                        data-artist="{{ track.artist|e }}"
+                        data-album="{{ track.album|e }}">
                         <div class="track-info">
                             <div class="track-title">{{ track.title }}</div>
                             <div class="track-meta">{{ track.artist }} &mdash; {{ track.album }}</div>
@@ -476,7 +479,13 @@
 
     async function playTrack(btn) {
         const li = btn.closest('[data-track-id]');
-        const payload = { track_id: li.dataset.trackId, source: li.dataset.source };
+        const payload = {
+            track_id: li.dataset.trackId,
+            source:   li.dataset.source,
+            title:    li.dataset.title  || null,
+            artist:   li.dataset.artist || null,
+            album:    li.dataset.album  || null,
+        };
 
         btn.disabled = true;
 
@@ -502,7 +511,13 @@
 
     async function queueTrack(btn) {
         const li = btn.closest('[data-track-id]');
-        const payload = { track_id: li.dataset.trackId, source: li.dataset.source };
+        const payload = {
+            track_id: li.dataset.trackId,
+            source:   li.dataset.source,
+            title:    li.dataset.title  || null,
+            artist:   li.dataset.artist || null,
+            album:    li.dataset.album  || null,
+        };
 
         btn.disabled = true;
 
@@ -587,7 +602,7 @@
             }
 
             tracksEl.innerHTML = tracks.map(t => `
-                <div class="track" data-track-id="${t.id}" data-source="${t.source}">
+                <div class="track" data-track-id="${t.id}" data-source="${t.source}" data-title="${t.title}" data-artist="${t.artist}" data-album="${t.album ?? ''}">
                     <div class="track-info">
                         <div class="track-title">${t.title}</div>
                         <div class="track-meta">${t.artist}</div>
@@ -629,7 +644,7 @@
             await fetch('/playback/queue', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ track_id: track.id, source: track.source }),
+                body: JSON.stringify({ track_id: track.id, source: track.source, title: track.title, artist: track.artist, album: track.album ?? null }),
             });
         }
 

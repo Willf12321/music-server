@@ -8,6 +8,7 @@ use App\Exception\UnresolvableTrackException;
 use App\Service\MpdPlayer\MpdDriver;
 use App\Service\MpdPlayer\MpdInspector;
 use App\Service\MpdPlayer\MpdQueuer;
+use App\Service\TrackMetadataStorer;
 use App\Service\TrackResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +30,7 @@ class PlaybackController extends AbstractController
         private readonly MpdDriver $driver,
         private readonly MpdInspector $inspector,
         private readonly TrackResolver $trackResolver,
+        private readonly TrackMetadataStorer $metadataStorer,
         private readonly LoggerInterface $logger,
         private readonly string $streamBaseUrl = 'http://nginx',
     ) {}
@@ -37,8 +39,10 @@ class PlaybackController extends AbstractController
     public function play(Request $request): JsonResponse
     {
         try {
-            $url = $this->trackResolver->resolveFromRequest($request);
+            $track = $this->trackResolver->extractFromRequest($request);
+            $url   = $this->trackResolver->resolve($track['track_id'], $track['source']);
             $this->queuer->play($url);
+            $this->metadataStorer->store($track['source'], $track['track_id'], $track);
         } catch (InvalidRequestBodyException $e) {
             return $this->json(['error' => $e->getMessage()], 422);
         } catch (UnresolvableTrackException $e) {
@@ -56,14 +60,15 @@ class PlaybackController extends AbstractController
     public function queue(Request $request): JsonResponse
     {
         try {
-            ['track_id' => $trackId, 'source' => $source] = $this->trackResolver->extractFromRequest($request);
+            $track = $this->trackResolver->extractFromRequest($request);
 
             // Use a proxy URL rather than resolving the stream URL immediately.
             // Tidal URLs are signed and expire within minutes — by the time MPD
             // auto-advances or the user presses next, a pre-resolved URL is stale.
             // The /stream endpoint resolves a fresh URL on demand when MPD fetches it.
-            $proxyUrl = "{$this->streamBaseUrl}/stream/{$source}/{$trackId}";
+            $proxyUrl = "{$this->streamBaseUrl}/stream/{$track['source']}/{$track['track_id']}";
             $this->queuer->addToQueue($proxyUrl);
+            $this->metadataStorer->store($track['source'], $track['track_id'], $track);
         } catch (InvalidRequestBodyException $e) {
             return $this->json(['error' => $e->getMessage()], 422);
         } catch (MpdException $e) {
@@ -127,7 +132,18 @@ class PlaybackController extends AbstractController
     public function status(): JsonResponse
     {
         try {
-            return $this->json($this->inspector->getStatus());
+            $status = $this->inspector->getStatus();
+
+            // Proxy URLs carry no file tags, so MPD's currentsong has no title/artist/album.
+            // Parse the source + track ID from the URL and look up what we stored at queue time.
+            if (isset($status['file']) && preg_match('#/stream/([^/]+)/([^/?]+)#', $status['file'], $m)) {
+                $metadata = $this->metadataStorer->retrieve($m[1], $m[2]);
+                if ($metadata !== null) {
+                    $status = array_merge($status, $metadata);
+                }
+            }
+
+            return $this->json($status);
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
