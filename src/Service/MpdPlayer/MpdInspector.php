@@ -10,9 +10,12 @@ class MpdInspector
 
     public function getStatus(): array
     {
-        $lines = $this->connector->sendCommand(MpdStatusCommand::Status);
+        $status      = $this->connector->parseResponse($this->connector->sendCommand(MpdStatusCommand::Status));
+        $currentSong = $this->connector->parseResponse($this->connector->sendCommand(MpdStatusCommand::CurrentSong));
 
-        return $this->connector->parseResponse($lines);
+        // Merge song metadata into the status response so the UI has everything
+        // it needs in a single request.
+        return array_merge($status, $currentSong);
     }
 
     public function getQueue(): array

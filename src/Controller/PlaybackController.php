@@ -143,6 +143,18 @@ class PlaybackController extends AbstractController
         }
     }
 
+    #[Route('/clear-queue', methods: ['POST'])]
+    public function clearQueue(): JsonResponse
+    {
+        try {
+            $this->queuer->clearQueue();
+        } catch (MpdException $e) {
+            return $this->json(['error' => $e->getMessage()], 502);
+        }
+
+        return $this->json(['status' => 'ok']);
+    }
+
     #[Route('/seek', methods: ['POST'])]
     public function seek(Request $request): JsonResponse
     {

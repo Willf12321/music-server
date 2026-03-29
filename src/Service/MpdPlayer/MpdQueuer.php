@@ -27,4 +27,9 @@ class MpdQueuer
     {
         $this->connector->sendCommand(MpdQueueCommand::Add, $uri);
     }
+
+    public function clearQueue(): void
+    {
+        $this->connector->sendCommand(MpdQueueCommand::Clear);
+    }
 }

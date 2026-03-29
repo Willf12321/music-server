@@ -290,6 +290,20 @@
             text-overflow: ellipsis;
         }
 
+        .now-playing-album {
+            font-size: 0.7rem;
+            color: #555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .now-playing-quality {
+            font-size: 0.65rem;
+            color: #444;
+            margin-top: 0.1rem;
+        }
+
         .playback-controls {
             display: flex;
             align-items: center;
@@ -425,6 +439,8 @@
         <div class="now-playing-info">
             <div class="now-playing-title" id="npTitle">—</div>
             <div class="now-playing-artist" id="npArtist"></div>
+            <div class="now-playing-album" id="npAlbum"></div>
+            <div class="now-playing-quality" id="npQuality"></div>
         </div>
 
         <div class="playback-controls">
@@ -440,6 +456,7 @@
         </div>
 
         <button class="btn queue-toggle" id="queueToggle" onclick="toggleQueue()">Queue (0)</button>
+        <button class="btn" onclick="clearQueue()">Clear</button>
     </div>
 </div>
 
@@ -510,6 +527,12 @@
             btn.textContent = 'Error';
             setTimeout(() => { btn.textContent = '+ Queue'; btn.disabled = false; }, 1500);
         }
+    }
+
+    async function clearQueue() {
+        await fetch('/playback/clear-queue', { method: 'POST' });
+        updateQueueToggle(0);
+        if (queueOpen) loadQueue();
     }
 
     // ── Tabs ──────────────────────────────────────────────────────────────
@@ -647,9 +670,16 @@
         if (status.title) {
             document.getElementById('npTitle').textContent  = status.title;
             document.getElementById('npArtist').textContent = status.artist ?? '';
+
+            const albumParts = [status.album, status.date].filter(Boolean);
+            document.getElementById('npAlbum').textContent = albumParts.join(' · ');
+
+            document.getElementById('npQuality').textContent = formatAudioQuality(status.audio, status.bitrate);
         } else if (state === 'stop') {
-            document.getElementById('npTitle').textContent  = '—';
-            document.getElementById('npArtist').textContent = '';
+            document.getElementById('npTitle').textContent   = '—';
+            document.getElementById('npArtist').textContent  = '';
+            document.getElementById('npAlbum').textContent   = '';
+            document.getElementById('npQuality').textContent = '';
         }
 
         updateSeekBar(elapsed, duration);
@@ -657,6 +687,23 @@
         if (status.volume !== undefined && !isAdjustingVolume) {
             document.getElementById('volumeSlider').value = status.volume;
         }
+    }
+
+    function formatAudioQuality(audio, bitrate) {
+        if (!audio && !bitrate) return '';
+
+        const parts = [];
+
+        if (audio) {
+            const [sampleRate, bits] = audio.split(':');
+            const khz = (parseInt(sampleRate) / 1000).toFixed(1);
+            parts.push(`${khz}kHz`);
+            if (bits && bits !== '0') parts.push(`${bits}-bit`);
+        }
+
+        if (bitrate) parts.push(`${bitrate}kbps`);
+
+        return parts.join(' · ');
     }
 
     function updateSeekBar(elapsed, duration) {
