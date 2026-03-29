@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\Exception\InvalidRequestBodyException;
 use App\Exception\MpdException;
-use App\Exception\UnresolvableTrackException;
 use App\Service\MpdPlayer\MpdDriver;
 use App\Service\MpdPlayer\MpdInspector;
 use App\Service\MpdPlayer\MpdQueuer;
@@ -39,14 +38,12 @@ class PlaybackController extends AbstractController
     public function play(Request $request): JsonResponse
     {
         try {
-            $track = $this->trackResolver->extractFromRequest($request);
-            $url   = $this->trackResolver->resolve($track['track_id'], $track['source']);
-            $this->queuer->play($url);
+            $track    = $this->trackResolver->extractFromRequest($request);
+            $proxyUrl = "{$this->streamBaseUrl}/stream/{$track['source']}/{$track['track_id']}";
+            $this->queuer->play($proxyUrl);
             $this->metadataStorer->store($track['source'], $track['track_id'], $track);
         } catch (InvalidRequestBodyException $e) {
             return $this->json(['error' => $e->getMessage()], 422);
-        } catch (UnresolvableTrackException $e) {
-            return $this->json(['error' => $e->getMessage()], 502);
         } catch (MpdException $e) {
             $this->logger->error('MPD play failed.', ['error' => $e->getMessage()]);
 
