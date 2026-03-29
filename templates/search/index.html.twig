@@ -397,6 +397,7 @@
                             <div class="album-title">{{ album.title }}</div>
                             <div class="album-meta">{{ album.artist }} &mdash; {{ album.numTracks }} tracks</div>
                         </div>
+                        <button class="btn" onclick="queueAlbum(this, event)">+ Queue All</button>
                         <span class="album-expand">▸</span>
                     </li>
                     <li class="album-tracks" id="album-tracks-{{ album.id|e }}"></li>
@@ -445,8 +446,10 @@
 <script>
     // ── State ──────────────────────────────────────────────────────────────
 
-    let queueOpen  = false;
-    let isSeeking  = false;  // true while the user is dragging the seek bar
+    let queueOpen         = false;
+    let isSeeking         = false;  // true while the user is dragging the seek bar
+    let isAdjustingVolume = false;  // true while the user is interacting with the volume slider
+    const albumTracksCache = new Map(); // keyed by album id — avoids re-fetching on queue-all
 
     // ── Playback commands ──────────────────────────────────────────────────
 
@@ -522,7 +525,20 @@
         if (albumsSection) albumsSection.style.display = (tab === 'all' || tab === 'albums') ? '' : 'none';
     }
 
-    // ── Album expand ───────────────────────────────────────────────────────
+    // ── Album tracks ───────────────────────────────────────────────────────
+
+    async function fetchAlbumTracks(albumId, source) {
+        if (albumTracksCache.has(albumId)) {
+            return albumTracksCache.get(albumId);
+        }
+
+        const res = await fetch(`/search/album/${albumId}/tracks?source=${source}`);
+        if (!res.ok) return null;
+
+        const tracks = await res.json();
+        albumTracksCache.set(albumId, tracks);
+        return tracks;
+    }
 
     async function toggleAlbum(li) {
         const albumId  = li.dataset.albumId;
@@ -537,19 +553,15 @@
             return;
         }
 
-        // Fetch tracks on first open — cache result in dataset so subsequent
-        // opens don't make another request.
         if (!tracksEl.dataset.loaded) {
             arrow.textContent = '…';
 
-            const res = await fetch(`/search/album/${albumId}/tracks?source=${source}`);
+            const tracks = await fetchAlbumTracks(albumId, source);
 
-            if (!res.ok) {
+            if (!tracks) {
                 arrow.textContent = '▸';
                 return;
             }
-
-            const tracks = await res.json();
 
             tracksEl.innerHTML = tracks.map(t => `
                 <div class="track" data-track-id="${t.id}" data-source="${t.source}">
@@ -570,6 +582,43 @@
 
         tracksEl.classList.add('open');
         arrow.textContent = '▾';
+    }
+
+    async function queueAlbum(btn, event) {
+        event.stopPropagation();
+
+        const li      = btn.closest('.album');
+        const albumId = li.dataset.albumId;
+        const source  = li.dataset.source;
+
+        btn.disabled = true;
+        btn.textContent = '…';
+
+        const tracks = await fetchAlbumTracks(albumId, source);
+
+        if (!tracks) {
+            btn.textContent = '+ Queue All';
+            btn.disabled = false;
+            return;
+        }
+
+        for (const track of tracks) {
+            await fetch('/playback/queue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ track_id: track.id, source: track.source }),
+            });
+        }
+
+        btn.textContent = 'Queued';
+        btn.classList.add('confirm');
+        setTimeout(() => {
+            btn.textContent = '+ Queue All';
+            btn.classList.remove('confirm');
+            btn.disabled = false;
+        }, 1500);
+
+        if (queueOpen) loadQueue();
     }
 
     // ── Status polling ─────────────────────────────────────────────────────
@@ -604,6 +653,10 @@
         }
 
         updateSeekBar(elapsed, duration);
+
+        if (status.volume !== undefined && !isAdjustingVolume) {
+            document.getElementById('volumeSlider').value = status.volume;
+        }
     }
 
     function updateSeekBar(elapsed, duration) {
@@ -690,13 +743,14 @@
     let volumeTimer = null;
 
     document.getElementById('volumeSlider').addEventListener('input', function () {
+        isAdjustingVolume = true;
         clearTimeout(volumeTimer);
         volumeTimer = setTimeout(() => {
             fetch('/playback/volume', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ volume: parseInt(this.value) }),
-            });
+            }).finally(() => { isAdjustingVolume = false; });
         }, 140);
     });
 </script>
