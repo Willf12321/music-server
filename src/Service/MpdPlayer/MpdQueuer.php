@@ -2,6 +2,7 @@
 
 namespace App\Service\MpdPlayer;
 
+use App\Enum\MpdPlaybackCommand;
 use App\Enum\MpdQueueCommand;
 
 class MpdQueuer
@@ -19,7 +20,7 @@ class MpdQueuer
     {
         $this->connector->sendCommand(MpdQueueCommand::Clear);
         $this->connector->sendCommand(MpdQueueCommand::Add, $uri);
-        $this->connector->sendCommand(MpdQueueCommand::Play);
+        $this->connector->sendCommand(MpdPlaybackCommand::Play);
     }
 
     /** Add a URI to the end of the current queue without interrupting playback. */

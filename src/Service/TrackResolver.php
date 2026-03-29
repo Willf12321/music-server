@@ -7,44 +7,17 @@ use App\Exception\UnresolvableTrackException;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Extracts track parameters from a request body and resolves them to a streamable URL.
+ * Extracts track parameters from a request body, and resolves track IDs to stream URLs.
  *
- * Centralises the decode → validate → resolve path so play and queue
- * endpoints share the same logic without duplication.
+ * Centralises the decode → validate path so play and queue endpoints share
+ * the same request-parsing logic without duplication.
  */
 class TrackResolver
 {
     public function __construct(private readonly SidecarClient $sidecar) {}
 
     /**
-     * @throws InvalidRequestBodyException if the body is missing or not valid JSON,
-     *                                     or if track_id / source are absent.
-     * @throws UnresolvableTrackException  if the sidecar cannot produce a stream URL.
-     */
-    public function resolveFromRequest(Request $request): string
-    {
-        ['track_id' => $trackId, 'source' => $source] = $this->extractFromRequest($request);
-
-        return $this->resolve($trackId, $source);
-    }
-
-    /** @throws UnresolvableTrackException if the sidecar cannot produce a stream URL. */
-    public function resolve(string $trackId, string $source): string
-    {
-        $url = $this->sidecar->resolve($trackId, $source);
-
-        if ($url === null) {
-            throw new UnresolvableTrackException('Could not resolve stream URL.');
-        }
-
-        return $url;
-    }
-
-    /**
      * Validates the request body and returns track_id, source, and optional metadata fields.
-     *
-     * Used when the caller wants to build a proxy URL rather than resolve immediately,
-     * e.g. when queuing tracks whose stream URLs would expire before playback.
      *
      * @return array{track_id: string, source: string, title: ?string, artist: ?string, album: ?string, date: ?string}
      * @throws InvalidRequestBodyException if the body is missing, invalid JSON, or missing required fields.
@@ -65,6 +38,18 @@ class TrackResolver
             'album'    => $body['album'] ?? null,
             'date'     => $body['date'] ?? null,
         ];
+    }
+
+    /** @throws UnresolvableTrackException if the sidecar cannot produce a stream URL. */
+    public function resolve(string $trackId, string $source): string
+    {
+        $url = $this->sidecar->resolve($trackId, $source);
+
+        if ($url === null) {
+            throw new UnresolvableTrackException('Could not resolve stream URL.');
+        }
+
+        return $url;
     }
 
     private function decodeBody(Request $request): array

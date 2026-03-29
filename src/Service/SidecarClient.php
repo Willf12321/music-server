@@ -89,17 +89,4 @@ class SidecarClient
         }
     }
 
-    public function health(): bool
-    {
-        try {
-            $response = $this->httpClient->request('GET', $this->baseUrl . '/health');
-            $data = $response->toArray();
-
-            return ($data['status'] ?? '') === 'ok';
-        } catch (\Throwable $e) {
-            $this->logger->error('Sidecar health check failed.', ['error' => $e->getMessage()]);
-
-            return false;
-        }
-    }
 }

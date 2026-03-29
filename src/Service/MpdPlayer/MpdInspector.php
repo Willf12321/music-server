@@ -10,8 +10,8 @@ class MpdInspector
 
     public function getStatus(): array
     {
-        $status      = $this->connector->parseResponse($this->connector->sendCommand(MpdStatusCommand::Status));
-        $currentSong = $this->connector->parseResponse($this->connector->sendCommand(MpdStatusCommand::CurrentSong));
+        $status      = $this->parseResponse($this->connector->sendCommand(MpdStatusCommand::Status));
+        $currentSong = $this->parseResponse($this->connector->sendCommand(MpdStatusCommand::CurrentSong));
 
         // Merge song metadata into the status response so the UI has everything
         // it needs in a single request.
@@ -33,7 +33,7 @@ class MpdInspector
                 $current = [];
             }
 
-            [$key, $value] = $this->connector->parseLine($line);
+            [$key, $value] = $this->parseLine($line);
             if ($key !== null) {
                 $current[strtolower($key)] = $value;
             }
@@ -49,5 +49,30 @@ class MpdInspector
             'artist'   => $entry['artist'] ?? '',
             'duration' => isset($entry['duration']) ? (int) $entry['duration'] : null,
         ], $queue);
+    }
+
+    private function parseLine(string $line): array
+    {
+        $pos = strpos($line, ': ');
+
+        if ($pos === false) {
+            return [null, null];
+        }
+
+        return [substr($line, 0, $pos), substr($line, $pos + 2)];
+    }
+
+    private function parseResponse(array $lines): array
+    {
+        $result = [];
+
+        foreach ($lines as $line) {
+            [$key, $value] = $this->parseLine($line);
+            if ($key !== null) {
+                $result[strtolower($key)] = $value;
+            }
+        }
+
+        return $result;
     }
 }

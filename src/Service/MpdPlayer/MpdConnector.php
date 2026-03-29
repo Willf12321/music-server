@@ -2,7 +2,6 @@
 
 namespace App\Service\MpdPlayer;
 
-use App\Enum\MpdCommandInterface;
 use App\Exception\MpdException;
 use Psr\Log\LoggerInterface;
 
@@ -26,7 +25,7 @@ class MpdConnector
     ) {}
 
     /**
-     * Send a command to MPD and return the response lines.
+     * Send a command to MPD and return the raw response lines.
      *
      * Connects, writes the command, reads until OK or ACK, then disconnects.
      * Throws MpdException on ACK so callers get a typed, readable error.
@@ -62,31 +61,6 @@ class MpdConnector
         } finally {
             $this->disconnect();
         }
-    }
-
-    public function parseLine(string $line): array
-    {
-        $pos = strpos($line, ': ');
-
-        if ($pos === false) {
-            return [null, null];
-        }
-
-        return [substr($line, 0, $pos), substr($line, $pos + 2)];
-    }
-
-    public function parseResponse(array $lines): array
-    {
-        $result = [];
-
-        foreach ($lines as $line) {
-            [$key, $value] = $this->parseLine($line);
-            if ($key !== null) {
-                $result[strtolower($key)] = $value;
-            }
-        }
-
-        return $result;
     }
 
     private function connect(): bool

@@ -2,7 +2,8 @@
 
 namespace App\Controller;
 
-use App\Service\SidecarClient;
+use App\Exception\UnresolvableTrackException;
+use App\Service\TrackResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -21,16 +22,16 @@ use Symfony\Component\Routing\Attribute\Route;
 class StreamProxyController extends AbstractController
 {
     public function __construct(
-        private readonly SidecarClient $sidecar,
+        private readonly TrackResolver $trackResolver,
         private readonly LoggerInterface $logger,
     ) {}
 
     #[Route('/stream/{source}/{trackId}', methods: ['GET'])]
     public function proxy(string $source, string $trackId): Response
     {
-        $url = $this->sidecar->resolve($trackId, $source);
-
-        if ($url === null) {
+        try {
+            $url = $this->trackResolver->resolve($trackId, $source);
+        } catch (UnresolvableTrackException) {
             $this->logger->error('Stream proxy failed to resolve track.', [
                 'track_id' => $trackId,
                 'source'   => $source,

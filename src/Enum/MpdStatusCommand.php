@@ -2,6 +2,8 @@
 
 namespace App\Enum;
 
+use App\Service\MpdPlayer\MpdCommandInterface;
+
 enum MpdStatusCommand: string implements MpdCommandInterface
 {
     case CurrentSong  = 'currentsong';
