@@ -68,17 +68,40 @@ class TidalSource:
         except Exception as e:
             logger.error("Tidal OAuth login failed: %s", e)
 
-    def search(self, query: str) -> list[dict]:
+    def search_tracks(self, query: str) -> list[dict]:
         if self._session is None:
             logger.warning("Tidal session not ready yet — search skipped.")
             return []
 
         try:
             results = self._session.search(query, models=[tidalapi.Track], limit=25)
-            tracks = results.get('tracks', [])
-            return [self._format_track(t) for t in tracks]
+            return [self._format_track(t) for t in results.get('tracks', [])]
         except Exception as e:
-            logger.error("Tidal search failed for query '%s': %s", query, e)
+            logger.error("Tidal track search failed for query '%s': %s", query, e)
+            return []
+
+    def search_albums(self, query: str) -> list[dict]:
+        if self._session is None:
+            logger.warning("Tidal session not ready yet — album search skipped.")
+            return []
+
+        try:
+            results = self._session.search(query, models=[tidalapi.Album], limit=10)
+            return [self._format_album(a) for a in results.get('albums', [])]
+        except Exception as e:
+            logger.error("Tidal album search failed for query '%s': %s", query, e)
+            return []
+
+    def get_album_tracks(self, album_id: str) -> list[dict]:
+        if self._session is None:
+            logger.error("Tidal session not ready — cannot fetch album tracks.")
+            return []
+
+        try:
+            album = self._session.album(int(album_id))
+            return [self._format_track(t) for t in album.tracks()]
+        except Exception as e:
+            logger.error("Failed to fetch tracks for Tidal album %s: %s", album_id, e)
             return []
 
     def resolve(self, track_id: str) -> str | None:
@@ -115,6 +138,15 @@ class TidalSource:
             logger.error("Failed to resolve Tidal track %s: %s", track_id, e)
 
         return None
+
+    def _format_album(self, album: tidalapi.Album) -> dict:
+        return {
+            "id": str(album.id),
+            "title": album.name,
+            "artist": album.artist.name if album.artist else "",
+            "num_tracks": album.num_tracks,
+            "source": "tidal",
+        }
 
     def _format_track(self, track: tidalapi.Track) -> dict:
         return {

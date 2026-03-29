@@ -19,25 +19,38 @@ def health():
 @app.get("/search")
 def search(q: str = "", source: str = "auto"):
     """
-    Search for tracks via the requested source.
+    Search for tracks and albums via the requested source.
 
-    source: "tidal" | "youtube" | "auto"
+    Returns {"tracks": [...], "albums": [...]}.
 
-    "auto" will eventually try Tidal first and fall back to YouTube Music
-    if no results are found. For now it delegates to Tidal only, as YouTube
-    support is not yet implemented.
+    source: "tidal" | "auto"
+    "auto" delegates to Tidal only for now — YouTube fallback not yet implemented.
     """
     if not q.strip():
         raise HTTPException(status_code=422, detail="Query parameter 'q' must not be empty.")
 
-    if source == "tidal":
-        return tidal.search(q)
+    return {
+        "tracks": tidal.search_tracks(q),
+        "albums": tidal.search_albums(q),
+    }
 
-    if source == "youtube":
-        return youtube.search(q)
 
-    # auto — Tidal first, YouTube fallback not yet implemented
-    return tidal.search(q)
+@app.get("/album/{album_id}/tracks")
+def album_tracks(album_id: str, source: str = "tidal"):
+    """
+    Return the full track listing for an album.
+
+    Called when the user expands an album in the search results.
+    """
+    if source != "tidal":
+        raise HTTPException(status_code=422, detail=f"Unsupported source: {source}")
+
+    tracks = tidal.get_album_tracks(album_id)
+
+    if not tracks:
+        raise HTTPException(status_code=404, detail="Album not found or has no tracks.")
+
+    return tracks
 
 
 class TrackRequest(BaseModel):

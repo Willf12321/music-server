@@ -41,6 +41,31 @@ class SidecarClient
         }
     }
 
+    public function getAlbumTracks(string $albumId, string $source): array
+    {
+        try {
+            $response = $this->httpClient->request(
+                'GET',
+                $this->baseUrl . "/album/{$albumId}/tracks",
+                ['query' => ['source' => $source]],
+            );
+
+            if ($response->getStatusCode() === 404) {
+                return [];
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Sidecar album tracks request failed.', [
+                'album_id' => $albumId,
+                'source'   => $source,
+                'error'    => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     public function resolve(string $trackId, string $source): ?string
     {
         try {

@@ -103,6 +103,84 @@
             font-size: 0.95rem;
         }
 
+        /* ── Tabs ── */
+
+        .tabs {
+            max-width: 640px;
+            margin: 0 auto 1.5rem;
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .tab {
+            padding: 0.4rem 0.9rem;
+            border-radius: 5px;
+            border: none;
+            background: transparent;
+            color: #555;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .tab:hover { color: #aaa; }
+        .tab.active { background: #2a2a2a; color: #eee; }
+
+        /* ── Section heading ── */
+
+        .section-heading {
+            max-width: 640px;
+            margin: 0 auto 0.5rem;
+            font-size: 0.7rem;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid #1e1e1e;
+        }
+
+        /* ── Album row ── */
+
+        .album {
+            display: flex;
+            align-items: center;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid #1e1e1e;
+            gap: 1rem;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .album:hover .album-title { color: #ccc; }
+
+        .album-info { flex: 1; min-width: 0; }
+
+        .album-title {
+            font-size: 1rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .album-meta {
+            font-size: 0.8rem;
+            color: #777;
+            margin-top: 0.2rem;
+        }
+
+        .album-expand { color: #555; font-size: 0.9rem; flex-shrink: 0; }
+
+        /* ── Album tracks (expanded) ── */
+
+        .album-tracks {
+            display: none;
+            padding: 0 0 0.25rem 1rem;
+            border-bottom: 1px solid #1e1e1e;
+            list-style: none;
+        }
+
+        .album-tracks.open { display: block; }
+
         /* ── Shared button style ── */
 
         .btn {
@@ -271,26 +349,61 @@
 </form>
 
 {% if searched %}
-    {% if results is empty %}
+    {% set hasTracks = result and result.tracks is not empty %}
+    {% set hasAlbums = result and result.albums is not empty %}
+
+    {% if not hasTracks and not hasAlbums %}
         <p class="no-results">No results found for "{{ query|e }}".</p>
     {% else %}
-        <ul class="results">
-            {% for track in results %}
-                <li class="track"
-                    data-track-id="{{ track.id|e }}"
-                    data-source="{{ track.source|e }}">
-                    <div class="track-info">
-                        <div class="track-title">{{ track.title }}</div>
-                        <div class="track-meta">{{ track.artist }} &mdash; {{ track.album }}</div>
-                    </div>
-                    <span class="track-duration">{{ track.formattedDuration() }}</span>
-                    <div class="track-actions">
-                        <button class="btn play-btn" onclick="playTrack(this)">▶</button>
-                        <button class="btn queue-btn" onclick="queueTrack(this)">+ Queue</button>
-                    </div>
-                </li>
-            {% endfor %}
-        </ul>
+        <div class="tabs">
+            <button class="tab active" onclick="setTab('all', this)">All</button>
+            <button class="tab" onclick="setTab('tracks', this)">Tracks</button>
+            <button class="tab" onclick="setTab('albums', this)">Albums</button>
+        </div>
+
+        {% if hasTracks %}
+        <div id="section-tracks">
+            <div class="section-heading">Tracks</div>
+            <ul class="results">
+                {% for track in result.tracks %}
+                    <li class="track"
+                        data-track-id="{{ track.id|e }}"
+                        data-source="{{ track.source|e }}">
+                        <div class="track-info">
+                            <div class="track-title">{{ track.title }}</div>
+                            <div class="track-meta">{{ track.artist }} &mdash; {{ track.album }}</div>
+                        </div>
+                        <span class="track-duration">{{ track.formattedDuration() }}</span>
+                        <div class="track-actions">
+                            <button class="btn play-btn" onclick="playTrack(this)">▶</button>
+                            <button class="btn queue-btn" onclick="queueTrack(this)">+ Queue</button>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if hasAlbums %}
+        <div id="section-albums" style="margin-top: 1.5rem">
+            <div class="section-heading">Albums</div>
+            <ul class="results">
+                {% for album in result.albums %}
+                    <li class="album"
+                        data-album-id="{{ album.id|e }}"
+                        data-source="{{ album.source|e }}"
+                        onclick="toggleAlbum(this)">
+                        <div class="album-info">
+                            <div class="album-title">{{ album.title }}</div>
+                            <div class="album-meta">{{ album.artist }} &mdash; {{ album.numTracks }} tracks</div>
+                        </div>
+                        <span class="album-expand">▸</span>
+                    </li>
+                    <li class="album-tracks" id="album-tracks-{{ album.id|e }}"></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
     {% endif %}
 {% endif %}
 
@@ -394,6 +507,69 @@
             btn.textContent = 'Error';
             setTimeout(() => { btn.textContent = '+ Queue'; btn.disabled = false; }, 1500);
         }
+    }
+
+    // ── Tabs ──────────────────────────────────────────────────────────────
+
+    function setTab(tab, btn) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+
+        const tracksSection = document.getElementById('section-tracks');
+        const albumsSection = document.getElementById('section-albums');
+
+        if (tracksSection) tracksSection.style.display = (tab === 'all' || tab === 'tracks') ? '' : 'none';
+        if (albumsSection) albumsSection.style.display = (tab === 'all' || tab === 'albums') ? '' : 'none';
+    }
+
+    // ── Album expand ───────────────────────────────────────────────────────
+
+    async function toggleAlbum(li) {
+        const albumId  = li.dataset.albumId;
+        const source   = li.dataset.source;
+        const arrow    = li.querySelector('.album-expand');
+        const tracksEl = document.getElementById(`album-tracks-${albumId}`);
+        const isOpen   = tracksEl.classList.contains('open');
+
+        if (isOpen) {
+            tracksEl.classList.remove('open');
+            arrow.textContent = '▸';
+            return;
+        }
+
+        // Fetch tracks on first open — cache result in dataset so subsequent
+        // opens don't make another request.
+        if (!tracksEl.dataset.loaded) {
+            arrow.textContent = '…';
+
+            const res = await fetch(`/search/album/${albumId}/tracks?source=${source}`);
+
+            if (!res.ok) {
+                arrow.textContent = '▸';
+                return;
+            }
+
+            const tracks = await res.json();
+
+            tracksEl.innerHTML = tracks.map(t => `
+                <div class="track" data-track-id="${t.id}" data-source="${t.source}">
+                    <div class="track-info">
+                        <div class="track-title">${t.title}</div>
+                        <div class="track-meta">${t.artist}</div>
+                    </div>
+                    <span class="track-duration">${t.duration}</span>
+                    <div class="track-actions">
+                        <button class="btn play-btn" onclick="playTrack(this)">▶</button>
+                        <button class="btn queue-btn" onclick="queueTrack(this)">+ Queue</button>
+                    </div>
+                </div>
+            `).join('');
+
+            tracksEl.dataset.loaded = '1';
+        }
+
+        tracksEl.classList.add('open');
+        arrow.textContent = '▾';
     }
 
     // ── Status polling ─────────────────────────────────────────────────────
