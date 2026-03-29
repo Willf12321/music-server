@@ -455,7 +455,7 @@
     }
 
     async function playTrack(btn) {
-        const li = btn.closest('li');
+        const li = btn.closest('[data-track-id]');
         const payload = { track_id: li.dataset.trackId, source: li.dataset.source };
 
         btn.disabled = true;
@@ -481,7 +481,7 @@
     }
 
     async function queueTrack(btn) {
-        const li = btn.closest('li');
+        const li = btn.closest('[data-track-id]');
         const payload = { track_id: li.dataset.trackId, source: li.dataset.source };
 
         btn.disabled = true;
