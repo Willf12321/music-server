@@ -363,16 +363,18 @@
 </form>
 
 {% if searched %}
-    {% set hasTracks = result and result.tracks is not empty %}
-    {% set hasAlbums = result and result.albums is not empty %}
+    {% set hasTracks  = result and result.tracks is not empty %}
+    {% set hasAlbums  = result and result.albums is not empty %}
+    {% set hasStations = result and result.stations is not empty %}
 
-    {% if not hasTracks and not hasAlbums %}
+    {% if not hasTracks and not hasAlbums and not hasStations %}
         <p class="no-results">No results found for "{{ query|e }}".</p>
     {% else %}
         <div class="tabs">
             <button class="tab active" onclick="setTab('all', this)">All</button>
             <button class="tab" onclick="setTab('tracks', this)">Tracks</button>
             <button class="tab" onclick="setTab('albums', this)">Albums</button>
+            <button class="tab" onclick="setTab('radio', this)">Radio</button>
         </div>
 
         {% if hasTracks %}
@@ -394,6 +396,25 @@
                         <div class="track-actions">
                             <button class="btn play-btn" onclick="playTrack(this)">▶</button>
                             <button class="btn queue-btn" onclick="queueTrack(this)">+ Queue</button>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if hasStations %}
+        <div id="section-radio" style="margin-top: 1.5rem">
+            <div class="section-heading">Radio</div>
+            <ul class="results">
+                {% for station in result.stations %}
+                    <li class="track" data-station-id="{{ station.id|e }}">
+                        <div class="track-info">
+                            <div class="track-title">{{ station.name }}</div>
+                            <div class="track-meta">{{ station.genre }} &mdash; Live</div>
+                        </div>
+                        <div class="track-actions">
+                            <button class="btn play-btn" onclick="playRadio(this)">▶</button>
                         </div>
                     </li>
                 {% endfor %}
@@ -558,9 +579,32 @@
 
         const tracksSection = document.getElementById('section-tracks');
         const albumsSection = document.getElementById('section-albums');
+        const radioSection  = document.getElementById('section-radio');
 
         if (tracksSection) tracksSection.style.display = (tab === 'all' || tab === 'tracks') ? '' : 'none';
         if (albumsSection) albumsSection.style.display = (tab === 'all' || tab === 'albums') ? '' : 'none';
+        if (radioSection)  radioSection.style.display  = (tab === 'all' || tab === 'radio')  ? '' : 'none';
+    }
+
+    async function playRadio(btn) {
+        const li        = btn.closest('[data-station-id]');
+        const stationId = li.dataset.stationId;
+
+        btn.disabled = true;
+
+        const res = await fetch('/playback/radio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ station_id: stationId }),
+        });
+
+        if (res.ok) {
+            btn.textContent = '✓';
+            setTimeout(() => { btn.textContent = '▶'; btn.disabled = false; }, 1500);
+        } else {
+            btn.textContent = 'Error';
+            setTimeout(() => { btn.textContent = '▶'; btn.disabled = false; }, 1500);
+        }
     }
 
     // ── Album tracks ───────────────────────────────────────────────────────

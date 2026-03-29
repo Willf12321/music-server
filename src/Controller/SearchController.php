@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\Dto\SearchResult;
+use App\Service\RadioSearcher;
 use App\Service\Searcher;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,7 +19,10 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 class SearchController extends AbstractController
 {
-    public function __construct(private readonly Searcher $searcher) {}
+    public function __construct(
+        private readonly Searcher $searcher,
+        private readonly RadioSearcher $radioSearcher,
+    ) {}
 
     #[Route('/', name: 'search_index')]
     #[Route('/search', name: 'search')]
@@ -33,9 +38,12 @@ class SearchController extends AbstractController
             ]);
         }
 
+        $sidecar = $this->searcher->search($query);
+        $result  = new SearchResult($sidecar->tracks, $sidecar->albums, $this->radioSearcher->search($query));
+
         return $this->render('search/index.html.twig', [
             'query'    => $query,
-            'result'   => $this->searcher->search($query),
+            'result'   => $result,
             'searched' => true,
         ]);
     }

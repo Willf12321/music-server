@@ -7,6 +7,7 @@ use App\Exception\MpdException;
 use App\Service\MpdPlayer\MpdDriver;
 use App\Service\MpdPlayer\MpdInspector;
 use App\Service\MpdPlayer\MpdQueuer;
+use App\Service\RadioSearcher;
 use App\Service\TrackMetadataStorer;
 use App\Service\TrackResolver;
 use Psr\Log\LoggerInterface;
@@ -30,6 +31,7 @@ class PlaybackController extends AbstractController
         private readonly MpdInspector $inspector,
         private readonly TrackResolver $trackResolver,
         private readonly TrackMetadataStorer $metadataStorer,
+        private readonly RadioSearcher $radioSearcher,
         private readonly LoggerInterface $logger,
         private readonly string $streamBaseUrl = 'http://nginx',
     ) {}
@@ -46,6 +48,33 @@ class PlaybackController extends AbstractController
             return $this->json(['error' => $e->getMessage()], 422);
         } catch (MpdException $e) {
             $this->logger->error('MPD play failed.', ['error' => $e->getMessage()]);
+
+            return $this->json(['error' => $e->getMessage()], 502);
+        }
+
+        return $this->json(['status' => 'ok']);
+    }
+
+    #[Route('/radio', methods: ['POST'])]
+    public function playRadio(Request $request): JsonResponse
+    {
+        $data      = json_decode($request->getContent(), true) ?? [];
+        $stationId = $data['station_id'] ?? null;
+
+        if (!$stationId) {
+            return $this->json(['error' => 'station_id is required.'], 422);
+        }
+
+        $station = $this->radioSearcher->findById($stationId);
+
+        if ($station === null) {
+            return $this->json(['error' => 'Station not found.'], 404);
+        }
+
+        try {
+            $this->queuer->play($station->streamUrl);
+        } catch (MpdException $e) {
+            $this->logger->error('MPD radio play failed.', ['error' => $e->getMessage()]);
 
             return $this->json(['error' => $e->getMessage()], 502);
         }
@@ -131,12 +160,22 @@ class PlaybackController extends AbstractController
         try {
             $status = $this->inspector->getStatus();
 
-            // Proxy URLs carry no file tags, so MPD's currentsong has no title/artist/album.
-            // Parse the source + track ID from the URL and look up what we stored at queue time.
-            if (isset($status['file']) && preg_match('#/stream/([^/]+)/([^/?]+)#', $status['file'], $m)) {
-                $metadata = $this->metadataStorer->retrieve($m[1], $m[2]);
-                if ($metadata !== null) {
-                    $status = array_merge($status, $metadata);
+            $file = $status['file'] ?? null;
+
+            if ($file !== null) {
+                // Proxy URLs carry no file tags — look up metadata stored at queue time.
+                if (preg_match('#/stream/([^/]+)/([^/?]+)#', $file, $m)) {
+                    $metadata = $this->metadataStorer->retrieve($m[1], $m[2]);
+                    if ($metadata !== null) {
+                        $status = array_merge($status, $metadata);
+                    }
+                }
+
+                // Radio streams have no tags either — identify by stream URL and use station name.
+                $station = $this->radioSearcher->findByStreamUrl($file);
+                if ($station !== null) {
+                    $status['title']  = $station->name;
+                    $status['artist'] = $station->genre;
                 }
             }
 
