@@ -19,20 +19,24 @@ def health():
 @app.get("/search")
 def search(q: str = "", source: str = "auto"):
     """
-    Search for tracks and albums via the requested source.
+    Search for tracks and albums.
 
-    Returns {"tracks": [...], "albums": [...]}.
+    Tidal is always tried first — it provides lossless FLAC. YouTube Music is
+    used as a fallback only when Tidal returns no tracks, so a user will never
+    see a 256kbps YouTube result when a lossless Tidal result exists.
 
     source: "tidal" | "auto"
-    "auto" delegates to Tidal only for now — YouTube fallback not yet implemented.
     """
     if not q.strip():
         raise HTTPException(status_code=422, detail="Query parameter 'q' must not be empty.")
 
-    return {
-        "tracks": tidal.search_tracks(q),
-        "albums": tidal.search_albums(q),
-    }
+    tracks = tidal.search_tracks(q)
+    albums = tidal.search_albums(q)
+
+    if source == "auto" and not tracks:
+        tracks = youtube.search_tracks(q)
+
+    return {"tracks": tracks, "albums": albums}
 
 
 @app.get("/album/{album_id}/tracks")
@@ -64,11 +68,12 @@ def resolve(request: TrackRequest):
     Resolve a stream URL for a given track, ready to hand to MPD.
 
     Called by Symfony immediately before passing a URL to MPD. URLs are not
-    cached because Tidal stream URLs are signed and expire after a short time.
-    Caching a URL would cause MPD to receive an expired URL on playback.
+    cached because stream URLs are signed and expire after a short time.
     """
     if request.source == "tidal":
         url = tidal.resolve(request.track_id)
+    elif request.source == "youtube":
+        url = youtube.resolve(request.track_id)
     else:
         raise HTTPException(status_code=422, detail=f"Unsupported source: {request.source}")
 
@@ -76,13 +81,3 @@ def resolve(request: TrackRequest):
         raise HTTPException(status_code=404, detail="Could not resolve stream URL.")
 
     return {"url": url}
-
-
-@app.post("/play")
-def play(request: TrackRequest):
-    """
-    Resolve a playable stream URL for the given track and source,
-    ready to be handed to MPD.
-    """
-    # TODO: resolve stream URL via the appropriate source and return it
-    return {"url": None}

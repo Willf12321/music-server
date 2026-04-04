@@ -90,6 +90,20 @@
             flex-shrink: 0;
         }
 
+        .source-badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-top: 0.2rem;
+        }
+
+        .source-badge.tidal   { background: #0a2030; color: #4a9aba; }
+        .source-badge.youtube { background: #2a0a0a; color: #c44; }
+
         .track-actions {
             display: flex;
             gap: 0.4rem;
@@ -393,6 +407,9 @@
                         <div class="track-info">
                             <div class="track-title">{{ track.title }}</div>
                             <div class="track-meta">{{ track.artist }} &mdash; {{ track.album }}</div>
+                            <span class="source-badge {{ track.source }}">
+                                {{- track.source == 'tidal' ? 'Tidal' : 'YT Music' -}}
+                            </span>
                         </div>
                         <span class="track-duration">{{ track.formattedDuration() }}</span>
                         <div class="track-actions">
@@ -693,6 +710,7 @@
                     <div class="track-info">
                         <div class="track-title">${t.title}</div>
                         <div class="track-meta">${t.artist}</div>
+                        <span class="source-badge ${t.source}">${t.source === 'tidal' ? 'Tidal' : 'YT Music'}</span>
                     </div>
                     <span class="track-duration">${t.duration}</span>
                     <div class="track-actions">
