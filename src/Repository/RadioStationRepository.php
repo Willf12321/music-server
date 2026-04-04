@@ -18,6 +18,21 @@ class RadioStationRepository extends ServiceEntityRepository
         return $this->findOneBy(['streamUrl' => $url]);
     }
 
+    /**
+     * Returns stations whose name contains the query (case-insensitive).
+     *
+     * @return RadioStation[]
+     */
+    public function findByNameContaining(string $query): array
+    {
+        return $this->createQueryBuilder('r')
+            ->where('LOWER(r.name) LIKE :q')
+            ->setParameter('q', '%' . strtolower($query) . '%')
+            ->orderBy('r.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function save(RadioStation $station): void
     {
         $this->getEntityManager()->persist($station);

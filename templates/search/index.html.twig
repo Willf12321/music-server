@@ -427,22 +427,13 @@
             <div class="section-heading">Radio</div>
             <ul class="results">
                 {% for station in result.stations %}
-                    <li class="track"
-                        data-stream-url="{{ station.streamUrl|e }}"
-                        data-saved-id="{{ station.savedId ?? '' }}"
-                        data-name="{{ station.name|e }}"
-                        data-genre="{{ station.genre|e }}">
+                    <li class="track" data-station-id="{{ station.id|e }}">
                         <div class="track-info">
                             <div class="track-title">{{ station.name }}</div>
-                            <div class="track-meta">{{ station.genre }} &mdash; Live</div>
+                            <div class="track-meta">{{ station.genre ?? 'Radio' }} &mdash; Live</div>
                         </div>
                         <div class="track-actions">
                             <button class="btn play-btn" onclick="playRadio(this)">▶</button>
-                            {% if station.isAdded %}
-                                <span class="btn" style="background:transparent;color:#5a5;cursor:default">✓ Added</span>
-                            {% else %}
-                                <button class="btn" onclick="addStation(this)">+ Add</button>
-                            {% endif %}
                         </div>
                     </li>
                 {% endfor %}
@@ -615,18 +606,13 @@
     }
 
     async function playRadio(btn) {
-        const li      = btn.closest('[data-stream-url]');
-        const savedId = li.dataset.savedId;
-        const payload = savedId
-            ? { station_id: parseInt(savedId) }
-            : { stream_url: li.dataset.streamUrl };
-
+        const li = btn.closest('[data-station-id]');
         btn.disabled = true;
 
         const res = await fetch('/playback/radio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ station_id: parseInt(li.dataset.stationId) }),
         });
 
         if (res.ok) {
@@ -635,35 +621,6 @@
         } else {
             btn.textContent = 'Error';
             setTimeout(() => { btn.textContent = '▶'; btn.disabled = false; }, 1500);
-        }
-    }
-
-    async function addStation(btn) {
-        const li = btn.closest('[data-stream-url]');
-
-        btn.disabled = true;
-        btn.textContent = 'Adding…';
-
-        const res = await fetch('/radio', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                name:       li.dataset.name,
-                stream_url: li.dataset.streamUrl,
-                genre:      li.dataset.genre,
-            }),
-        });
-
-        if (res.ok || res.redirected) {
-            btn.textContent = '✓ Added';
-            btn.style.background = 'transparent';
-            btn.style.color = '#5a5';
-            btn.style.cursor = 'default';
-            btn.onclick = null;
-            li.dataset.savedId = '';  // will be populated on next search
-        } else {
-            btn.textContent = 'Error';
-            btn.disabled = false;
         }
     }
 

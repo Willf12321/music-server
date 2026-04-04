@@ -2,12 +2,14 @@
 
 namespace App\Dto;
 
+use App\Entity\RadioStation;
+
 readonly class SearchResult
 {
     /**
-     * @param Track[]             $tracks
-     * @param Album[]             $albums
-     * @param DiscoveredStation[] $stations
+     * @param Track[]         $tracks
+     * @param Album[]         $albums
+     * @param RadioStation[]  $stations
      */
     public function __construct(
         public array $tracks,

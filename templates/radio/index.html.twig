@@ -49,6 +49,9 @@
         .btn-danger:hover { background: #4a2020; }
         .btn-edit    { background: #1a2a3a; color: #8ae; }
         .btn-edit:hover { background: #203040; }
+        .btn-play    { background: #1a3a1a; color: #8e8; }
+        .btn-play:hover { background: #204020; }
+        .btn-play:disabled { opacity: 0.5; cursor: default; }
 
         .station-list {
             max-width: 640px;
@@ -117,6 +120,7 @@
                     <div class="station-meta">{{ station.genre ?? 'No genre' }} &mdash; {{ station.streamUrl }}</div>
                 </div>
                 <div class="station-actions">
+                    <button class="btn btn-play" onclick="playStation({{ station.id }}, this)">▶ Play</button>
                     <a href="/radio/{{ station.id }}/edit" class="btn btn-edit">Edit</a>
                     <form method="POST" action="/radio/{{ station.id }}/delete" style="display:inline"
                           onsubmit="return confirm('Delete {{ station.name|e('js') }}?')">
@@ -128,5 +132,25 @@
     </ul>
 {% endif %}
 
+<script>
+    async function playStation(id, btn) {
+        btn.disabled = true;
+        btn.textContent = '…';
+
+        const res = await fetch('/playback/radio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ station_id: id }),
+        });
+
+        if (res.ok) {
+            btn.textContent = '✓ Playing';
+            setTimeout(() => { btn.textContent = '▶ Play'; btn.disabled = false; }, 1500);
+        } else {
+            btn.textContent = 'Error';
+            setTimeout(() => { btn.textContent = '▶ Play'; btn.disabled = false; }, 1500);
+        }
+    }
+</script>
 </body>
 </html>
