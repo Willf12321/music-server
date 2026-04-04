@@ -192,7 +192,21 @@ class PlaybackController extends AbstractController
     public function getQueue(): JsonResponse
     {
         try {
-            return $this->json($this->inspector->getQueue());
+            $entries = $this->inspector->getQueue();
+
+            $enriched = array_map(function (array $entry) {
+                if (preg_match('#/stream/([^/]+)/([^/?]+)#', $entry['file'] ?? '', $m)) {
+                    $metadata = $this->metadataStorer->retrieve($m[1], $m[2]);
+                    if ($metadata !== null) {
+                        $entry = array_merge($entry, $metadata);
+                    }
+                }
+
+                unset($entry['file']);
+                return $entry;
+            }, $entries);
+
+            return $this->json($enriched);
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }

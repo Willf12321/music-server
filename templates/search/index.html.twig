@@ -849,9 +849,10 @@
             return;
         }
 
-        list.innerHTML = tracks.map(t =>
-            `<li>${t.title}<span>${t.artist}</span></li>`
-        ).join('');
+        list.innerHTML = tracks.map(t => {
+            const meta = [t.artist, t.album].filter(Boolean).join(' — ');
+            return `<li>${t.title ?? 'Unknown'}<span>${meta}</span></li>`;
+        }).join('');
     }
 
     function toggleQueue() {

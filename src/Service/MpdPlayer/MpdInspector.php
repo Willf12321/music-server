@@ -45,8 +45,10 @@ class MpdInspector
 
         return array_map(static fn(array $entry) => [
             'pos'      => $entry['pos'] ?? null,
-            'title'    => $entry['title'] ?? $entry['file'] ?? 'Unknown',
-            'artist'   => $entry['artist'] ?? '',
+            'file'     => $entry['file'] ?? null,
+            'title'    => $entry['title'] ?? null,
+            'artist'   => $entry['artist'] ?? null,
+            'album'    => $entry['album'] ?? null,
             'duration' => isset($entry['duration']) ? (int) $entry['duration'] : null,
         ], $queue);
     }
