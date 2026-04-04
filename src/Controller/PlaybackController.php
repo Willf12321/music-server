@@ -192,6 +192,9 @@ class PlaybackController extends AbstractController
     public function getQueue(): JsonResponse
     {
         try {
+            $status        = $this->inspector->getStatus();
+            $currentSongId = isset($status['songid']) ? (int) $status['songid'] : null;
+
             $entries = $this->inspector->getQueue();
 
             $enriched = array_map(function (array $entry) {
@@ -206,10 +209,25 @@ class PlaybackController extends AbstractController
                 return $entry;
             }, $entries);
 
-            return $this->json($enriched);
+            // Exclude the currently-playing track — it's already shown in the now-playing bar.
+            $upcoming = array_values(array_filter($enriched, fn($e) => $e['id'] !== $currentSongId));
+
+            return $this->json($upcoming);
         } catch (MpdException $e) {
             return $this->json(['error' => $e->getMessage()], 502);
         }
+    }
+
+    #[Route('/queue/{id}', methods: ['DELETE'])]
+    public function removeFromQueue(int $id): JsonResponse
+    {
+        try {
+            $this->queuer->removeById($id);
+        } catch (MpdException $e) {
+            return $this->json(['error' => $e->getMessage()], 502);
+        }
+
+        return $this->json(['status' => 'ok']);
     }
 
     #[Route('/clear-queue', methods: ['POST'])]

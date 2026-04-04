@@ -33,6 +33,10 @@ class MpdQueuer
      */
     public function addToQueue(string $uri): void
     {
+        // Consume mode removes each track from the queue once it finishes playing,
+        // so only upcoming tracks remain visible. Set it each time as MPD doesn't
+        // persist options across restarts.
+        $this->connector->sendCommand(MpdQueueCommand::Consume, '1');
         $this->connector->sendCommand(MpdQueueCommand::Add, $uri);
 
         if ($this->isStopped()) {
@@ -51,6 +55,11 @@ class MpdQueuer
         }
 
         return false;
+    }
+
+    public function removeById(int $songId): void
+    {
+        $this->connector->sendCommand(MpdQueueCommand::DeleteId, (string) $songId);
     }
 
     public function clearQueue(): void

@@ -202,15 +202,15 @@
 
         .queue-panel {
             position: fixed;
-            bottom: 90px; /* sits above the now-playing bar */
+            top: 0;
+            bottom: 0;
             left: 0;
             right: 0;
-            max-height: 40vh;
             overflow-y: auto;
-            background: #1a1a1a;
-            border-top: 1px solid #2a2a2a;
+            background: #111;
             display: none;
             padding: 0.75rem 1rem;
+            z-index: 10;
         }
 
         .queue-panel.open { display: block; }
@@ -222,12 +222,16 @@
         }
 
         .queue-panel li {
+            display: flex;
+            align-items: center;
             padding: 0.4rem 0;
             border-bottom: 1px solid #222;
             font-size: 0.875rem;
+            gap: 0.75rem;
         }
 
-        .queue-panel li span { color: #777; margin-left: 0.5rem; font-size: 0.8rem; }
+        .queue-panel li .queue-track-info { flex: 1; min-width: 0; }
+        .queue-panel li span { color: #777; font-size: 0.8rem; display: block; margin-top: 0.1rem; }
 
         /* ── Now playing bar ── */
 
@@ -266,11 +270,12 @@
         .controls-row {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.5rem;
+            flex-wrap: wrap;
         }
 
         .now-playing-info {
-            flex: 1;
+            width: 100%;
             min-width: 0;
         }
 
@@ -308,6 +313,7 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            flex: 1;
         }
 
         .playback-controls .btn {
@@ -319,7 +325,6 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            flex-shrink: 0;
         }
 
         .volume-wrap label { font-size: 0.75rem; color: #555; }
@@ -344,9 +349,6 @@
         #seekBar { flex: 1; width: 100%; }
         #volumeSlider { width: 80px; }
 
-        .queue-toggle {
-            flex-shrink: 0;
-        }
     </style>
 </head>
 <body>
@@ -461,7 +463,14 @@
 </div>
 
 <!-- Now playing bar — fixed to the bottom of the viewport -->
-<div class="now-playing">
+<div class="now-playing" id="nowPlayingBar">
+    <div class="now-playing-info">
+        <div class="now-playing-title" id="npTitle">—</div>
+        <div class="now-playing-artist" id="npArtist"></div>
+        <div class="now-playing-album" id="npAlbum"></div>
+        <div class="now-playing-quality" id="npQuality"></div>
+    </div>
+
     <div class="seek-row">
         <span class="seek-time" id="seekElapsed">0:00</span>
         <input type="range" id="seekBar" min="0" max="0" value="0">
@@ -469,13 +478,6 @@
     </div>
 
     <div class="controls-row">
-        <div class="now-playing-info">
-            <div class="now-playing-title" id="npTitle">—</div>
-            <div class="now-playing-artist" id="npArtist"></div>
-            <div class="now-playing-album" id="npAlbum"></div>
-            <div class="now-playing-quality" id="npQuality"></div>
-        </div>
-
         <div class="playback-controls">
             <button class="btn" onclick="sendCommand('/playback/previous')">⏮</button>
             <button class="btn" id="playPauseBtn" onclick="sendCommand('/playback/pause')">⏸</button>
@@ -488,7 +490,7 @@
             <input type="range" id="volumeSlider" min="0" max="100" value="80">
         </div>
 
-        <button class="btn queue-toggle" id="queueToggle" onclick="toggleQueue()">Queue (0)</button>
+        <button class="btn" id="queueToggle" onclick="toggleQueue()">Queue (0)</button>
         <button class="btn" onclick="clearQueue()">Clear</button>
     </div>
 </div>
@@ -851,18 +853,43 @@
 
         list.innerHTML = tracks.map(t => {
             const meta = [t.artist, t.album].filter(Boolean).join(' — ');
-            return `<li>${t.title ?? 'Unknown'}<span>${meta}</span></li>`;
+            return `<li>
+                <div class="queue-track-info">
+                    ${t.title ?? 'Unknown'}
+                    ${meta ? `<span>${meta}</span>` : ''}
+                </div>
+                <button class="btn" onclick="removeFromQueue(${t.id}, this)">Remove</button>
+            </li>`;
         }).join('');
+    }
+
+    async function removeFromQueue(songId, btn) {
+        btn.disabled = true;
+        const res = await fetch(`/playback/queue/${songId}`, { method: 'DELETE' });
+        if (res.ok) {
+            btn.closest('li').remove();
+        } else {
+            btn.disabled = false;
+        }
+    }
+
+    function setQueuePanelBottom() {
+        const bar   = document.getElementById('nowPlayingBar');
+        const panel = document.getElementById('queuePanel');
+        panel.style.bottom = bar.offsetHeight + 'px';
     }
 
     function toggleQueue() {
         const panel = document.getElementById('queuePanel');
         queueOpen = !queueOpen;
+        setQueuePanelBottom();
         panel.classList.toggle('open', queueOpen);
 
         // Load queue contents each time the panel is opened.
         if (queueOpen) loadQueue();
     }
+
+    window.addEventListener('resize', () => { if (queueOpen) setQueuePanelBottom(); });
 
     // ── Seek bar ───────────────────────────────────────────────────────────
 

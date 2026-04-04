@@ -44,6 +44,7 @@ class MpdInspector
         }
 
         return array_map(static fn(array $entry) => [
+            'id'       => isset($entry['id']) ? (int) $entry['id'] : null,
             'pos'      => $entry['pos'] ?? null,
             'file'     => $entry['file'] ?? null,
             'title'    => $entry['title'] ?? null,
