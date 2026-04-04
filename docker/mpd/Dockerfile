@@ -1,6 +1,6 @@
 FROM alpine:3.19
 
-RUN apk add --no-cache mpd
+RUN apk add --no-cache mpd ffmpeg
 
 COPY mpd.conf /etc/mpd.conf
 
