@@ -25,9 +25,9 @@ class RadioSearcher
         $this->catalogue = [
             ['name' => 'NTS Radio 1',  'streamUrl' => 'https://stream-relay-geo.ntslive.net/stream',  'genre' => 'Various'],
             ['name' => 'NTS Radio 2',  'streamUrl' => 'https://stream-relay-geo.ntslive.net/stream2', 'genre' => 'Various'],
-            ['name' => 'BBC 6 Music',  'streamUrl' => 'hls+http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_6music.m3u8',     'genre' => 'Alternative'],
-            ['name' => 'BBC Radio 1',  'streamUrl' => 'hls+http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_radio_one.m3u8',   'genre' => 'Pop'],
-            ['name' => 'BBC Radio 2',  'streamUrl' => 'hls+http://a.files.bbci.co.uk/media/live/manifesto/audio/simulcast/hls/uk/sbr_high/ak/bbc_radio_two.m3u8',   'genre' => 'Easy Listening'],
+            ['name' => 'BBC 6 Music',  'streamUrl' => 'hls+http://as-hls-ww-live.akamaized.net/pool_81827798/live/ww/bbc_6music/bbc_6music.isml/bbc_6music-audio=320000.norewind.m3u8',         'genre' => 'Alternative'],
+            ['name' => 'BBC Radio 1',  'streamUrl' => 'hls+http://as-hls-ww-live.akamaized.net/pool_01505109/live/ww/bbc_radio_one/bbc_radio_one.isml/bbc_radio_one-audio=320000.norewind.m3u8', 'genre' => 'Pop'],
+            ['name' => 'BBC Radio 2',  'streamUrl' => 'hls+http://as-hls-ww-live.akamaized.net/pool_74208725/live/ww/bbc_radio_two/bbc_radio_two.isml/bbc_radio_two-audio=320000.norewind.m3u8', 'genre' => 'Easy Listening'],
         ];
     }
 
