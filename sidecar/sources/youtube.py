@@ -31,7 +31,7 @@ class YouTubeSource:
     def search_tracks(self, query: str) -> list[dict]:
         try:
             with yt_dlp.YoutubeDL(_SEARCH_OPTS) as ydl:
-                results = ydl.extract_info(f"ytmsearch10:{query}", download=False)
+                results = ydl.extract_info(f"ytsearch10:{query}", download=False)
                 entries = results.get('entries', []) if results else []
                 return [self._format_track(e) for e in entries if e and e.get('id')]
         except Exception as e:
