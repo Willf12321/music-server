@@ -496,7 +496,9 @@
 
         <div class="volume-wrap">
             <label for="volumeSlider">vol</label>
+            <button class="btn" onclick="nudgeVolume(-5)">−</button>
             <input type="range" id="volumeSlider" min="0" max="100" value="80">
+            <button class="btn" onclick="nudgeVolume(+5)">+</button>
         </div>
 
         <button class="btn" id="queueToggle" onclick="toggleQueue()">Queue (0)</button>
@@ -904,6 +906,21 @@
             }).finally(() => { isAdjustingVolume = false; });
         }, 140);
     });
+
+    function nudgeVolume(delta) {
+        const slider = document.getElementById('volumeSlider');
+        const next = Math.min(100, Math.max(0, parseInt(slider.value) + delta));
+        slider.value = next;
+        isAdjustingVolume = true;
+        clearTimeout(volumeTimer);
+        volumeTimer = setTimeout(() => {
+            fetch('/playback/volume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ volume: next }),
+            }).finally(() => { isAdjustingVolume = false; });
+        }, 140);
+    }
 </script>
 
 </body>
