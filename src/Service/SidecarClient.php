@@ -27,7 +27,7 @@ class SidecarClient
 
         try {
             $response = $this->httpClient->request('GET', $this->baseUrl . '/search', [
-                'query' => ['q' => $query, 'source' => 'auto'],
+                'query' => ['q' => $query],
             ]);
 
             return $response->toArray();

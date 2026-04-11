@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -17,24 +18,24 @@ def health():
 
 
 @app.get("/search")
-def search(q: str = "", source: str = "auto"):
+def search(q: str = ""):
     """
-    Search for tracks and albums.
+    Search for tracks and albums across all sources simultaneously.
 
-    Tidal is always tried first — it provides lossless FLAC. YouTube Music is
-    used as a fallback only when Tidal returns no tracks, so a user will never
-    see a 256kbps YouTube result when a lossless Tidal result exists.
-
-    source: "tidal" | "auto"
+    Tidal and YouTube are queried in parallel. Results from both appear in the
+    response, each tagged with their source. Tidal tracks are listed first.
+    Albums come from Tidal only (YouTube has no album concept).
     """
     if not q.strip():
         raise HTTPException(status_code=422, detail="Query parameter 'q' must not be empty.")
 
-    tracks = tidal.search_tracks(q)
-    albums = tidal.search_albums(q)
+    with ThreadPoolExecutor() as executor:
+        f_tidal_tracks  = executor.submit(tidal.search_tracks, q)
+        f_tidal_albums  = executor.submit(tidal.search_albums, q)
+        f_youtube_tracks = executor.submit(youtube.search_tracks, q)
 
-    if source == "auto" and not tracks:
-        tracks = youtube.search_tracks(q)
+    tracks = f_tidal_tracks.result() + f_youtube_tracks.result()
+    albums = f_tidal_albums.result()
 
     return {"tracks": tracks, "albums": albums}
 
