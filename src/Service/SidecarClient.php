@@ -66,6 +66,88 @@ class SidecarClient
         }
     }
 
+    public function searchUsers(string $query): array
+    {
+        if ($query === '') {
+            throw new \InvalidArgumentException('Search query must not be empty.');
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $this->baseUrl . '/users/search', [
+                'query' => ['q' => $query],
+            ]);
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Sidecar user search request failed.', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Fetch public playlists for a Tidal user by their numeric ID.
+     *
+     * Tidal user IDs are integers. Rejecting non-numeric values here prevents
+     * path traversal from a malformed route parameter reaching the sidecar.
+     */
+    public function getUserPlaylists(string $userId): array
+    {
+        if (!ctype_digit($userId)) {
+            throw new \InvalidArgumentException("Invalid Tidal user ID: {$userId}");
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $this->baseUrl . "/users/{$userId}/playlists");
+
+            if ($response->getStatusCode() === 404) {
+                return [];
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Sidecar user playlists request failed.', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Fetch tracks for a Tidal playlist by its UUID.
+     *
+     * Tidal playlist IDs are UUIDs. Rejecting values that don't match the
+     * UUID format prevents malformed route parameters reaching the sidecar.
+     */
+    public function getPlaylistTracks(string $playlistId): array
+    {
+        if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $playlistId)) {
+            throw new \InvalidArgumentException("Invalid Tidal playlist ID: {$playlistId}");
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $this->baseUrl . "/playlists/{$playlistId}/tracks");
+
+            if ($response->getStatusCode() === 404) {
+                return [];
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Sidecar playlist tracks request failed.', [
+                'playlist_id' => $playlistId,
+                'error'       => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     public function resolve(string $trackId, string $source): ?string
     {
         try {

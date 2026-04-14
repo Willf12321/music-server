@@ -383,8 +383,9 @@
     {% set hasTracks  = result and result.tracks is not empty %}
     {% set hasAlbums  = result and result.albums is not empty %}
     {% set hasStations = result and result.stations is not empty %}
+    {% set hasUsers   = result and result.users is not empty %}
 
-    {% if not hasTracks and not hasAlbums and not hasStations %}
+    {% if not hasTracks and not hasAlbums and not hasStations and not hasUsers %}
         <p class="no-results">No results found for "{{ query|e }}".</p>
     {% else %}
         <div class="tabs">
@@ -392,6 +393,7 @@
             <button class="tab" onclick="setTab('tracks', this)">Tracks</button>
             <button class="tab" onclick="setTab('albums', this)">Albums</button>
             <button class="tab" onclick="setTab('radio', this)">Radio</button>
+            <button class="tab" onclick="setTab('users', this)">Users</button>
         </div>
 
         {% if hasTracks %}
@@ -463,6 +465,26 @@
             </ul>
         </div>
         {% endif %}
+
+        {% if hasUsers %}
+        <div id="section-users" style="margin-top: 1.5rem">
+            <div class="section-heading">Users</div>
+            <ul class="results">
+                {% for user in result.users %}
+                    <li class="album"
+                        data-user-id="{{ user.id|e }}"
+                        onclick="toggleUser(this)">
+                        <div class="album-info">
+                            <div class="album-title">{{ user.name }}</div>
+                            <div class="album-meta">Tidal user</div>
+                        </div>
+                        <span class="album-expand">▸</span>
+                    </li>
+                    <li class="album-tracks" id="user-playlists-{{ user.id|e }}"></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
     {% endif %}
 {% endif %}
 
@@ -507,6 +529,16 @@
 </div>
 
 <script>
+    // ── Utilities ──────────────────────────────────────────────────────────
+
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     // ── State ──────────────────────────────────────────────────────────────
 
     let queueOpen         = false;
@@ -602,10 +634,12 @@
         const tracksSection = document.getElementById('section-tracks');
         const albumsSection = document.getElementById('section-albums');
         const radioSection  = document.getElementById('section-radio');
+        const usersSection  = document.getElementById('section-users');
 
         if (tracksSection) tracksSection.style.display = (tab === 'all' || tab === 'tracks') ? '' : 'none';
         if (albumsSection) albumsSection.style.display = (tab === 'all' || tab === 'albums') ? '' : 'none';
         if (radioSection)  radioSection.style.display  = (tab === 'all' || tab === 'radio')  ? '' : 'none';
+        if (usersSection)  usersSection.style.display  = (tab === 'all' || tab === 'users')  ? '' : 'none';
     }
 
     async function playRadio(btn) {
@@ -666,13 +700,18 @@
             }
 
             tracksEl.innerHTML = tracks.map(t => `
-                <div class="track" data-track-id="${t.id}" data-source="${t.source}" data-title="${t.title}" data-artist="${t.artist}" data-album="${t.album ?? ''}">
+                <div class="track"
+                     data-track-id="${escapeHtml(t.id)}"
+                     data-source="${escapeHtml(t.source)}"
+                     data-title="${escapeHtml(t.title)}"
+                     data-artist="${escapeHtml(t.artist)}"
+                     data-album="${escapeHtml(t.album)}">
                     <div class="track-info">
-                        <div class="track-title">${t.title}</div>
-                        <div class="track-meta">${t.artist}</div>
-                        <span class="source-badge ${t.source}">${t.source === 'tidal' ? 'Tidal' : 'YT Music'}</span>
+                        <div class="track-title">${escapeHtml(t.title)}</div>
+                        <div class="track-meta">${escapeHtml(t.artist)}</div>
+                        <span class="source-badge ${escapeHtml(t.source)}">${t.source === 'tidal' ? 'Tidal' : 'YT Music'}</span>
                     </div>
-                    <span class="track-duration">${t.duration}</span>
+                    <span class="track-duration">${escapeHtml(t.duration)}</span>
                     <div class="track-actions">
                         <button class="btn play-btn" onclick="playTrack(this)">▶</button>
                         <button class="btn queue-btn" onclick="queueTrack(this)">+ Queue</button>
@@ -830,13 +869,13 @@
         }
 
         list.innerHTML = tracks.map(t => {
-            const meta = [t.artist, t.album].filter(Boolean).join(' — ');
+            const meta = [t.artist, t.album].filter(Boolean).map(escapeHtml).join(' — ');
             return `<li>
                 <div class="queue-track-info">
-                    ${t.title ?? 'Unknown'}
+                    ${escapeHtml(t.title ?? 'Unknown')}
                     ${meta ? `<span>${meta}</span>` : ''}
                 </div>
-                <button class="btn" onclick="removeFromQueue(${t.id}, this)">Remove</button>
+                <button class="btn" onclick="removeFromQueue(${parseInt(t.id)}, this)">Remove</button>
             </li>`;
         }).join('');
     }
@@ -906,6 +945,155 @@
             }).finally(() => { isAdjustingVolume = false; });
         }, 140);
     });
+
+    // ── User / playlist expand ─────────────────────────────────────────────
+
+    const userPlaylistsCache  = new Map(); // user id  → playlist list
+    const playlistTracksCache = new Map(); // playlist id → track list
+
+    async function toggleUser(li) {
+        const userId    = li.dataset.userId;
+        const arrow     = li.querySelector('.album-expand');
+        const container = document.getElementById(`user-playlists-${userId}`);
+        const isOpen    = container.classList.contains('open');
+
+        if (isOpen) {
+            container.classList.remove('open');
+            arrow.textContent = '▸';
+            return;
+        }
+
+        if (!container.dataset.loaded) {
+            arrow.textContent = '…';
+
+            let playlists = userPlaylistsCache.get(userId);
+            if (!playlists) {
+                const res = await fetch(`/users/${userId}/playlists`);
+                if (!res.ok) { arrow.textContent = '▸'; return; }
+                playlists = await res.json();
+                userPlaylistsCache.set(userId, playlists);
+            }
+
+            if (playlists.length === 0) {
+                container.innerHTML = '<div class="track-meta" style="padding:0.5rem 0;color:#555">No public playlists.</div>';
+            } else {
+                container.innerHTML = playlists.map(p => `
+                    <div class="album" data-playlist-id="${escapeHtml(p.id)}" onclick="togglePlaylist(this)" style="padding-left:1rem">
+                        <div class="album-info">
+                            <div class="album-title">${escapeHtml(p.name)}</div>
+                            <div class="album-meta">${escapeHtml(p.num_tracks)} tracks${p.description ? ' &mdash; ' + escapeHtml(p.description) : ''}</div>
+                        </div>
+                        <button class="btn" onclick="queuePlaylist(this, event)">+ Queue All</button>
+                        <span class="album-expand">▸</span>
+                    </div>
+                    <div class="album-tracks" id="playlist-tracks-${escapeHtml(p.id)}"></div>
+                `).join('');
+            }
+
+            container.dataset.loaded = '1';
+        }
+
+        container.classList.add('open');
+        arrow.textContent = '▾';
+    }
+
+    async function fetchPlaylistTracks(playlistId) {
+        if (playlistTracksCache.has(playlistId)) {
+            return playlistTracksCache.get(playlistId);
+        }
+
+        const res = await fetch(`/playlists/${playlistId}/tracks`);
+        if (!res.ok) return null;
+
+        const tracks = await res.json();
+        playlistTracksCache.set(playlistId, tracks);
+        return tracks;
+    }
+
+    async function togglePlaylist(el) {
+        const playlistId = el.dataset.playlistId;
+        const arrow      = el.querySelector('.album-expand');
+        const tracksEl   = document.getElementById(`playlist-tracks-${playlistId}`);
+        const isOpen     = tracksEl.classList.contains('open');
+
+        if (isOpen) {
+            tracksEl.classList.remove('open');
+            arrow.textContent = '▸';
+            return;
+        }
+
+        if (!tracksEl.dataset.loaded) {
+            arrow.textContent = '…';
+
+            const tracks = await fetchPlaylistTracks(playlistId);
+
+            if (!tracks) {
+                arrow.textContent = '▸';
+                return;
+            }
+
+            tracksEl.innerHTML = tracks.map(t => `
+                <div class="track"
+                     data-track-id="${escapeHtml(t.id)}"
+                     data-source="${escapeHtml(t.source)}"
+                     data-title="${escapeHtml(t.title)}"
+                     data-artist="${escapeHtml(t.artist)}"
+                     data-album="${escapeHtml(t.album)}">
+                    <div class="track-info">
+                        <div class="track-title">${escapeHtml(t.title)}</div>
+                        <div class="track-meta">${escapeHtml(t.artist)} &mdash; ${escapeHtml(t.album)}</div>
+                        <span class="source-badge ${escapeHtml(t.source)}">${t.source === 'tidal' ? 'Tidal' : 'YT Music'}</span>
+                    </div>
+                    <span class="track-duration">${escapeHtml(t.duration)}</span>
+                    <div class="track-actions">
+                        <button class="btn play-btn" onclick="playTrack(this)">▶</button>
+                        <button class="btn queue-btn" onclick="queueTrack(this)">+ Queue</button>
+                    </div>
+                </div>
+            `).join('');
+
+            tracksEl.dataset.loaded = '1';
+        }
+
+        tracksEl.classList.add('open');
+        arrow.textContent = '▾';
+    }
+
+    async function queuePlaylist(btn, event) {
+        event.stopPropagation();
+
+        const el         = btn.closest('[data-playlist-id]');
+        const playlistId = el.dataset.playlistId;
+
+        btn.disabled = true;
+        btn.textContent = '…';
+
+        const tracks = await fetchPlaylistTracks(playlistId);
+
+        if (!tracks) {
+            btn.textContent = '+ Queue All';
+            btn.disabled = false;
+            return;
+        }
+
+        for (const track of tracks) {
+            await fetch('/playback/queue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ track_id: track.id, source: track.source, title: track.title, artist: track.artist, album: track.album ?? null }),
+            });
+        }
+
+        btn.textContent = 'Queued';
+        btn.classList.add('confirm');
+        setTimeout(() => {
+            btn.textContent = '+ Queue All';
+            btn.classList.remove('confirm');
+            btn.disabled = false;
+        }, 1500);
+
+        if (queueOpen) loadQueue();
+    }
 
     function nudgeVolume(delta) {
         const slider = document.getElementById('volumeSlider');

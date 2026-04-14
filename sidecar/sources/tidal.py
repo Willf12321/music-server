@@ -139,6 +139,60 @@ class TidalSource:
 
         return None
 
+    def search_users(self, query: str) -> list[dict]:
+        if self._session is None:
+            logger.warning("Tidal session not ready yet — user search skipped.")
+            return []
+
+        try:
+            results = self._session.search(query, models=[tidalapi.UserProfile], limit=10)
+            return [self._format_user(u) for u in results.get('user_profiles', [])]
+        except Exception as e:
+            logger.error("Tidal user search failed for query '%s': %s", query, e)
+            return []
+
+    def get_user_playlists(self, user_id: str) -> list[dict] | None:
+        """
+        Return the public playlists for a Tidal user, or None if the user
+        cannot be found or the request fails.
+
+        An empty list means the user exists but has no public playlists.
+        None means the lookup itself failed, so the caller can 404.
+        """
+        if self._session is None:
+            logger.error("Tidal session not ready — cannot fetch user playlists.")
+            return None
+
+        try:
+            user = tidalapi.user.User(self._session, int(user_id))
+            playlists = user.playlists()
+            return [self._format_playlist(p) for p in playlists if p is not None]
+        except Exception as e:
+            logger.error("Failed to fetch playlists for Tidal user %s: %s", user_id, e)
+            return None
+
+    def get_playlist_tracks(self, playlist_id: str) -> list[dict] | None:
+        """
+        Return all audio tracks in a playlist, or None if the playlist cannot
+        be found or the request fails.
+
+        Video items are filtered out — a playlist that contains only videos
+        returns an empty list rather than None. None is reserved for genuine
+        lookup failures so the caller can 404 appropriately.
+        """
+        if self._session is None:
+            logger.error("Tidal session not ready — cannot fetch playlist tracks.")
+            return None
+
+        try:
+            playlist = self._session.playlist(playlist_id)
+            items = playlist.items()
+            # Playlist items may include videos — only return audio tracks.
+            return [self._format_track(t) for t in items if isinstance(t, tidalapi.Track)]
+        except Exception as e:
+            logger.error("Failed to fetch tracks for Tidal playlist %s: %s", playlist_id, e)
+            return None
+
     def _format_album(self, album: tidalapi.Album) -> dict:
         return {
             "id": str(album.id),
@@ -146,6 +200,20 @@ class TidalSource:
             "artist": album.artist.name if album.artist else "",
             "num_tracks": album.num_tracks,
             "source": "tidal",
+        }
+
+    def _format_user(self, user: tidalapi.UserProfile) -> dict:
+        return {
+            "id": str(user.id),
+            "name": user.name,
+        }
+
+    def _format_playlist(self, playlist: tidalapi.Playlist) -> dict:
+        return {
+            "id": str(playlist.id),
+            "name": playlist.name,
+            "num_tracks": playlist.num_tracks,
+            "description": playlist.description or "",
         }
 
     def _format_track(self, track: tidalapi.Track) -> dict:

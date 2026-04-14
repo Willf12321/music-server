@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Dto\SearchResult;
 use App\Service\RadioSearcher;
 use App\Service\Searcher;
+use App\Service\UserSearcher;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -12,16 +13,17 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Intentionally thin — all logic lives in Searcher.
+ * Intentionally thin — all logic lives in the searcher services.
  *
  * The controller's only job is to read from the request, delegate to the
- * searcher, and hand results to the template.
+ * searchers, and hand results to the template.
  */
 class SearchController extends AbstractController
 {
     public function __construct(
         private readonly Searcher $searcher,
         private readonly RadioSearcher $radioSearcher,
+        private readonly UserSearcher $userSearcher,
     ) {}
 
     #[Route('/', name: 'search_index')]
@@ -39,7 +41,12 @@ class SearchController extends AbstractController
         }
 
         $sidecar = $this->searcher->search($query);
-        $result  = new SearchResult($sidecar->tracks, $sidecar->albums, $this->radioSearcher->search($query));
+        $result  = new SearchResult(
+            $sidecar->tracks,
+            $sidecar->albums,
+            $this->radioSearcher->search($query),
+            $this->userSearcher->search($query),
+        );
 
         return $this->render('search/index.html.twig', [
             'query'    => $query,

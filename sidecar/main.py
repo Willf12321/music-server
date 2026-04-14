@@ -58,6 +58,50 @@ def album_tracks(album_id: str, source: str = "tidal"):
     return tracks
 
 
+@app.get("/users/search")
+def search_users(q: str = ""):
+    """
+    Search Tidal for user profiles matching the query.
+    """
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="Query parameter 'q' must not be empty.")
+
+    return tidal.search_users(q)
+
+
+@app.get("/users/{user_id}/playlists")
+def user_playlists(user_id: str):
+    """
+    Return public playlists for a given Tidal user.
+
+    Returns an empty list when the user exists but has no public playlists.
+    404 when the user cannot be found or the request fails.
+    """
+    playlists = tidal.get_user_playlists(user_id)
+
+    if playlists is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    return playlists
+
+
+@app.get("/playlists/{playlist_id}/tracks")
+def playlist_tracks(playlist_id: str):
+    """
+    Return the full track listing for a playlist.
+
+    Returns an empty list when the playlist exists but contains only videos.
+    404 when the playlist cannot be found or the request fails.
+    Called when the user expands a playlist in the UI.
+    """
+    tracks = tidal.get_playlist_tracks(playlist_id)
+
+    if tracks is None:
+        raise HTTPException(status_code=404, detail="Playlist not found.")
+
+    return tracks
+
+
 class TrackRequest(BaseModel):
     track_id: str
     source: str
