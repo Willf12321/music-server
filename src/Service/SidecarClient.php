@@ -66,52 +66,15 @@ class SidecarClient
         }
     }
 
-    public function searchUsers(string $query): array
+    public function getMyPlaylists(): array
     {
-        if ($query === '') {
-            throw new \InvalidArgumentException('Search query must not be empty.');
-        }
-
         try {
-            $response = $this->httpClient->request('GET', $this->baseUrl . '/users/search', [
-                'query' => ['q' => $query],
-            ]);
+            $response = $this->httpClient->request('GET', $this->baseUrl . '/me/playlists');
 
             return $response->toArray();
         } catch (\Throwable $e) {
-            $this->logger->error('Sidecar user search request failed.', [
-                'query' => $query,
+            $this->logger->error('Sidecar my playlists request failed.', [
                 'error' => $e->getMessage(),
-            ]);
-
-            return [];
-        }
-    }
-
-    /**
-     * Fetch public playlists for a Tidal user by their numeric ID.
-     *
-     * Tidal user IDs are integers. Rejecting non-numeric values here prevents
-     * path traversal from a malformed route parameter reaching the sidecar.
-     */
-    public function getUserPlaylists(string $userId): array
-    {
-        if (!ctype_digit($userId)) {
-            throw new \InvalidArgumentException("Invalid Tidal user ID: {$userId}");
-        }
-
-        try {
-            $response = $this->httpClient->request('GET', $this->baseUrl . "/users/{$userId}/playlists");
-
-            if ($response->getStatusCode() === 404) {
-                return [];
-            }
-
-            return $response->toArray();
-        } catch (\Throwable $e) {
-            $this->logger->error('Sidecar user playlists request failed.', [
-                'user_id' => $userId,
-                'error'   => $e->getMessage(),
             ]);
 
             return [];

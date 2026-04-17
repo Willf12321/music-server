@@ -139,53 +139,22 @@ class TidalSource:
 
         return None
 
-    def search_users(self, query: str) -> list[dict]:
+    def get_my_playlists(self) -> list[dict] | None:
         """
-        Search for Tidal users by name.
+        Return the playlists belonging to the authenticated Tidal user.
 
-        tidalapi's session.search() only covers tracks/albums/artists/playlists/videos.
-        User search requires calling the Tidal API directly — the session's request
-        object provides authenticated access to any v1 endpoint.
-        """
-        if self._session is None:
-            logger.warning("Tidal session not ready yet — user search skipped.")
-            return []
-
-        try:
-            response = self._session.request.basic_request(
-                'GET', 'search/users',
-                params={'query': query, 'limit': 10},
-            )
-            response.raise_for_status()
-            users = response.json().get('items', [])
-            return [self._format_user(u) for u in users]
-        except Exception as e:
-            logger.error("Tidal user search failed for query '%s': %s", query, e)
-            return []
-
-    def get_user_playlists(self, user_id: str) -> list[dict] | None:
-        """
-        Return the public playlists for a Tidal user, or None if the user
-        cannot be found or the request fails.
-
-        An empty list means the user exists but has no public playlists.
-        None means the lookup itself failed, so the caller can 404.
-
-        Uses the same API path as LoggedInUser.playlists() but for an arbitrary user ID.
+        Uses LoggedInUser.playlists() which covers all playlists the user owns,
+        not just public ones. Returns None only when the session is not ready.
         """
         if self._session is None:
-            logger.error("Tidal session not ready — cannot fetch user playlists.")
+            logger.error("Tidal session not ready — cannot fetch my playlists.")
             return None
 
         try:
-            playlist_obj = self._session.playlist()
-            playlists = self._session.request.map_request(
-                "users/%s/playlists" % user_id,
-                parse=playlist_obj.parse_factory,
-            )
+            playlists = self._session.user.playlists()
             return [self._format_playlist(p) for p in playlists if p is not None]
         except Exception as e:
-            logger.error("Failed to fetch playlists for Tidal user %s: %s", user_id, e)
+            logger.error("Failed to fetch my playlists: %s", e)
             return None
 
     def get_playlist_tracks(self, playlist_id: str) -> list[dict] | None:
@@ -217,15 +186,6 @@ class TidalSource:
             "artist": album.artist.name if album.artist else "",
             "num_tracks": album.num_tracks,
             "source": "tidal",
-        }
-
-    def _format_user(self, user: dict) -> dict:
-        first = user.get('firstName') or ''
-        last = user.get('lastName') or ''
-        name = ' '.join(filter(None, [first, last])) or 'Unknown'
-        return {
-            "id": str(user['id']),
-            "name": name,
         }
 
     def _format_playlist(self, playlist: tidalapi.Playlist) -> dict:

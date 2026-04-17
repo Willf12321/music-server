@@ -377,15 +377,20 @@
     >
     <button type="submit">Search</button>
     <a href="/radio" class="btn" style="text-decoration:none;white-space:nowrap">📻 Radio</a>
+    <button class="btn" onclick="toggleMyPlaylists()" style="white-space:nowrap">My Playlists</button>
 </form>
 
-{% if searched %}
-    {% set hasTracks  = result and result.tracks is not empty %}
-    {% set hasAlbums  = result and result.albums is not empty %}
-    {% set hasStations = result and result.stations is not empty %}
-    {% set hasUsers   = result and result.users is not empty %}
+<div id="my-playlists-section" style="display:none;max-width:640px;margin:0 auto 1.5rem;">
+    <div class="section-heading">My Playlists</div>
+    <div id="my-playlists-list"></div>
+</div>
 
-    {% if not hasTracks and not hasAlbums and not hasStations and not hasUsers %}
+{% if searched %}
+    {% set hasTracks   = result and result.tracks is not empty %}
+    {% set hasAlbums   = result and result.albums is not empty %}
+    {% set hasStations = result and result.stations is not empty %}
+
+    {% if not hasTracks and not hasAlbums and not hasStations %}
         <p class="no-results">No results found for "{{ query|e }}".</p>
     {% else %}
         <div class="tabs">
@@ -393,7 +398,6 @@
             <button class="tab" onclick="setTab('tracks', this)">Tracks</button>
             <button class="tab" onclick="setTab('albums', this)">Albums</button>
             <button class="tab" onclick="setTab('radio', this)">Radio</button>
-            <button class="tab" onclick="setTab('users', this)">Users</button>
         </div>
 
         {% if hasTracks %}
@@ -466,25 +470,6 @@
         </div>
         {% endif %}
 
-        {% if hasUsers %}
-        <div id="section-users" style="margin-top: 1.5rem">
-            <div class="section-heading">Users</div>
-            <ul class="results">
-                {% for user in result.users %}
-                    <li class="album"
-                        data-user-id="{{ user.id|e }}"
-                        onclick="toggleUser(this)">
-                        <div class="album-info">
-                            <div class="album-title">{{ user.name }}</div>
-                            <div class="album-meta">Tidal user</div>
-                        </div>
-                        <span class="album-expand">▸</span>
-                    </li>
-                    <li class="album-tracks" id="user-playlists-{{ user.id|e }}"></li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
     {% endif %}
 {% endif %}
 
@@ -634,12 +619,10 @@
         const tracksSection = document.getElementById('section-tracks');
         const albumsSection = document.getElementById('section-albums');
         const radioSection  = document.getElementById('section-radio');
-        const usersSection  = document.getElementById('section-users');
 
         if (tracksSection) tracksSection.style.display = (tab === 'all' || tab === 'tracks') ? '' : 'none';
         if (albumsSection) albumsSection.style.display = (tab === 'all' || tab === 'albums') ? '' : 'none';
         if (radioSection)  radioSection.style.display  = (tab === 'all' || tab === 'radio')  ? '' : 'none';
-        if (usersSection)  usersSection.style.display  = (tab === 'all' || tab === 'users')  ? '' : 'none';
     }
 
     async function playRadio(btn) {
@@ -946,55 +929,47 @@
         }, 140);
     });
 
-    // ── User / playlist expand ─────────────────────────────────────────────
+    // ── My Playlists ───────────────────────────────────────────────────────
 
-    const userPlaylistsCache  = new Map(); // user id  → playlist list
     const playlistTracksCache = new Map(); // playlist id → track list
 
-    async function toggleUser(li) {
-        const userId    = li.dataset.userId;
-        const arrow     = li.querySelector('.album-expand');
-        const container = document.getElementById(`user-playlists-${userId}`);
-        const isOpen    = container.classList.contains('open');
+    let myPlaylistsOpen   = false;
+    let myPlaylistsLoaded = false;
 
-        if (isOpen) {
-            container.classList.remove('open');
-            arrow.textContent = '▸';
+    async function toggleMyPlaylists() {
+        const section = document.getElementById('my-playlists-section');
+        myPlaylistsOpen = !myPlaylistsOpen;
+        section.style.display = myPlaylistsOpen ? '' : 'none';
+
+        if (!myPlaylistsOpen || myPlaylistsLoaded) return;
+
+        const list = document.getElementById('my-playlists-list');
+        list.innerHTML = '<div class="track-meta" style="padding:0.5rem 0;color:#555">Loading…</div>';
+
+        const res = await fetch('/me/playlists');
+        if (!res.ok) {
+            list.innerHTML = '<div class="track-meta" style="padding:0.5rem 0;color:#555">Failed to load playlists.</div>';
             return;
         }
 
-        if (!container.dataset.loaded) {
-            arrow.textContent = '…';
-
-            let playlists = userPlaylistsCache.get(userId);
-            if (!playlists) {
-                const res = await fetch(`/users/${userId}/playlists`);
-                if (!res.ok) { arrow.textContent = '▸'; return; }
-                playlists = await res.json();
-                userPlaylistsCache.set(userId, playlists);
-            }
-
-            if (playlists.length === 0) {
-                container.innerHTML = '<div class="track-meta" style="padding:0.5rem 0;color:#555">No public playlists.</div>';
-            } else {
-                container.innerHTML = playlists.map(p => `
-                    <div class="album" data-playlist-id="${escapeHtml(p.id)}" onclick="togglePlaylist(this)" style="padding-left:1rem">
-                        <div class="album-info">
-                            <div class="album-title">${escapeHtml(p.name)}</div>
-                            <div class="album-meta">${escapeHtml(p.num_tracks)} tracks${p.description ? ' &mdash; ' + escapeHtml(p.description) : ''}</div>
-                        </div>
-                        <button class="btn" onclick="queuePlaylist(this, event)">+ Queue All</button>
-                        <span class="album-expand">▸</span>
+        const playlists = await res.json();
+        if (playlists.length === 0) {
+            list.innerHTML = '<div class="track-meta" style="padding:0.5rem 0;color:#555">No playlists found.</div>';
+        } else {
+            list.innerHTML = playlists.map(p => `
+                <div class="album" data-playlist-id="${escapeHtml(p.id)}" onclick="togglePlaylist(this)">
+                    <div class="album-info">
+                        <div class="album-title">${escapeHtml(p.name)}</div>
+                        <div class="album-meta">${escapeHtml(String(p.num_tracks))} tracks${p.description ? ' &mdash; ' + escapeHtml(p.description) : ''}</div>
                     </div>
-                    <div class="album-tracks" id="playlist-tracks-${escapeHtml(p.id)}"></div>
-                `).join('');
-            }
-
-            container.dataset.loaded = '1';
+                    <button class="btn" onclick="queuePlaylist(this, event)">+ Queue All</button>
+                    <span class="album-expand">▸</span>
+                </div>
+                <div class="album-tracks" id="playlist-tracks-${escapeHtml(p.id)}"></div>
+            `).join('');
         }
 
-        container.classList.add('open');
-        arrow.textContent = '▾';
+        myPlaylistsLoaded = true;
     }
 
     async function fetchPlaylistTracks(playlistId) {
