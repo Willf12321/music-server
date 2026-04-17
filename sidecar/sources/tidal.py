@@ -158,7 +158,7 @@ class TidalSource:
             )
             response.raise_for_status()
             body = response.json()
-            logger.info("Tidal user search raw response: %s", body)
+            print("Tidal user search raw response:", body, flush=True)
             users = body.get('users', {}).get('items', [])
             return [self._format_user(u) for u in users]
         except Exception as e:
