@@ -157,7 +157,9 @@ class TidalSource:
                 params={'query': query, 'limit': 10, 'types': 'USERS'},
             )
             response.raise_for_status()
-            users = response.json().get('users', {}).get('items', [])
+            body = response.json()
+            logger.info("Tidal user search raw response: %s", body)
+            users = body.get('users', {}).get('items', [])
             return [self._format_user(u) for u in users]
         except Exception as e:
             logger.error("Tidal user search failed for query '%s': %s", query, e)
